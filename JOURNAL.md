@@ -6,6 +6,20 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-10 — Le front parle au back
+
+**Fait :** première traversée entre briques — la page d'accueil affiche
+l'état du backend (`BackendStatus.vue`, testé fetch mocké : test rouge
+d'abord). Vérifié en réel dans le navigateur, dans les deux sens : backend
+démarré → « Backend is up » ; conteneur backend arrêté → « Backend is
+down ».
+
+**Décision — proxy Vite plutôt que CORS.** Le front appelle `/api/*`, le
+dev server Vite retire le préfixe et forwarde vers `backend:8080` — le
+même contrat de routage que Caddy assurera en prod. Aucune configuration
+CORS nulle part : le navigateur ne voit qu'une seule origine, en dev comme
+en prod.
+
 ## 2026-07-10 — Naissance du backend
 
 **Fait :** deuxième brique — `backend/` (ASP.NET Core minimal API, .NET 10

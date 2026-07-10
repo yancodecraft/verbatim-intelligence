@@ -1,11 +1,8 @@
 using System.Net;
 
-using Microsoft.AspNetCore.Mvc.Testing;
-
 namespace VerbatimIntelligence.Api.Tests;
 
-public class HealthEndpointTests(WebApplicationFactory<Program> factory)
-    : IClassFixture<WebApplicationFactory<Program>>
+public class HealthEndpointTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
     [Fact]
     public async Task GetHealth_ReturnsOk()

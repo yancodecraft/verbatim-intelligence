@@ -6,6 +6,37 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-10 — La table `analyses` et le lien backend ↔ Postgres
+
+**Fait :** Postgres 18 dans le compose (digest épinglé, aucun port publié —
+`make psql` ouvre un client dans le conteneur), et la première table du
+schéma-contrat : `analyses` (id UUID v7, status contraint par CHECK,
+created_at). EF Core en est l'unique propriétaire : entité `Analysis`,
+`AppDbContext`, migration `InitialCreate` générée par `dotnet ef` en
+conteneur, appliquée au démarrage en dev (`Database__MigrateOnStartup` —
+en prod ce sera une étape de déploiement). Endpoints `POST /analyses`
+(crée une analyse `pending`) et `GET /analyses/{id}`, écrits en TDD.
+
+**Décisions :**
+- **Le schéma parle snake_case** (`UseSnakeCaseNamingConvention`) et les
+  statuts sont des chaînes en minuscules : le worker Python lira et écrira
+  ces colonnes, le schéma est un contrat entre deux langages, pas un détail
+  C#. Le CHECK sur `status` est le garde partagé — vérifié en réel : un
+  `UPDATE … SET status='bogus'` est rejeté par la base.
+- **Testcontainers dès le premier test d'intégration** : l'API est testée
+  contre un vrai Postgres jetable, jamais un fake. Les tests tournant déjà
+  en conteneur, `make test` monte le socket Docker (et
+  `TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal`, les ports mappés
+  étant publiés sur l'hôte Docker) — compromis dev assumé.
+- **`/health` inclut désormais la base** (`AddDbContextCheck`) : « Backend
+  is up » sur la page d'accueil signifie API **et** base joignables.
+- L'horloge est injectée (`TimeProvider`) — on abstrait les frontières,
+  pas les concepts.
+
+Piège Postgres 18 : l'image officielle veut son volume monté sur
+`/var/lib/postgresql` (plus `…/data`), pour des `pg_upgrade` sans franchir
+un point de montage.
+
 ## 2026-07-10 — Le front parle au back
 
 **Fait :** première traversée entre briques — la page d'accueil affiche

@@ -22,9 +22,37 @@ services:
     volumes:
       - ./backend:/app
       - backend_nuget:/home/app/.nuget
+    environment:
+      # Dev-only credentials, matching the postgres service below.
+      ConnectionStrings__Database: "Host=postgres;Database=verbatim;Username=verbatim;Password=verbatim"
+      Database__MigrateOnStartup: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+    environment:
+      # Dev-only credentials; production gets real secrets outside the repo.
+      POSTGRES_DB: verbatim
+      POSTGRES_USER: verbatim
+      POSTGRES_PASSWORD: verbatim
+    # No published port: the database is only reachable from the compose
+    # network (make psql opens a client inside the container).
+    volumes:
+      # Postgres 18+ images want the mount one level above .../data, so the
+      # data lands in a versioned subdirectory (pg_upgrade-friendly).
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U verbatim -d verbatim"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
 volumes:
   # Mask the bind mount: dependencies are the image's (linux builds),
   # never the host's. Seeded from the image on first start.
   frontend_node_modules:
   backend_nuget:
+  # Database data — survives make rebuild (it is not a dependency volume).
+  postgres_data:

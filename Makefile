@@ -11,7 +11,7 @@ TRIVY_IMAGE = aquasec/trivy@sha256:cffe3f5161a47a6823fbd23d985795b3ed72a4c806da4
 DEP_VOLUMES = verbatim-intelligence_frontend_node_modules \
               verbatim-intelligence_backend_nuget
 
-.PHONY: help up down rebuild logs ps lint audit test outdated
+.PHONY: help up down rebuild logs ps psql lint audit test outdated
 
 help: ## List available targets
 	@grep -E '^[a-z][a-zA-Z_-]*:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -33,6 +33,9 @@ logs: ## Tail all container logs
 ps: ## Show container status
 	docker compose ps
 
+psql: ## Open a psql shell in the postgres container
+	docker compose exec postgres psql -U verbatim -d verbatim
+
 lint: ## Run all linters (frontend Biome, backend dotnet format, Dockerfiles hadolint)
 	docker compose run --rm --no-deps frontend npm run lint
 	docker compose run --rm --no-deps backend dotnet build VerbatimIntelligence.slnx
@@ -43,9 +46,17 @@ audit: ## Security checks (Trivy: misconfigurations + lockfile CVEs)
 	docker run --rm -v "$(CURDIR)":/repo -w /repo $(TRIVY_IMAGE) config --exit-code 1 .
 	docker run --rm -v "$(CURDIR)":/repo -w /repo $(TRIVY_IMAGE) fs --exit-code 1 --scanners vuln,secret .
 
+# Backend integration tests spawn throwaway Postgres containers via
+# Testcontainers, hence the Docker socket mount (root-only) and the host
+# override (mapped ports are published on the Docker host, not in this
+# container). NUGET_PACKAGES keeps the app user's package cache in use.
 test: ## Run all tests
 	docker compose run --rm --no-deps frontend npm run test:unit -- --run
-	docker compose run --rm --no-deps backend dotnet test VerbatimIntelligence.slnx
+	docker compose run --rm --no-deps --user root \
+	  -v /var/run/docker.sock:/var/run/docker.sock \
+	  -e TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal \
+	  -e NUGET_PACKAGES=/home/app/.nuget/packages \
+	  backend dotnet test VerbatimIntelligence.slnx
 
 outdated: ## Report outdated dependencies per brick
 	-docker compose run --rm --no-deps frontend npm outdated

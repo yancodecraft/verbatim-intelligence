@@ -54,7 +54,7 @@ niveaux :
   | Brique | Lint + format | Types / analyse |
   |---|---|---|
   | `frontend/` | Biome (`noUnusedImports`/`noUnusedVariables` désactivées sur `*.vue` : Biome n'analyse que le bloc script, pas le template) | `vue-tsc` en CI |
-  | `backend/` | Analyzers Roslyn (`AnalysisLevel=latest`, `EnforceCodeStyleInBuild`), `.editorconfig`, `TreatWarningsAsErrors` | nullable reference types activés |
+  | `backend/` | Analyzers Roslyn (`AnalysisLevel=latest`, `EnforceCodeStyleInBuild`) + SonarAnalyzer.CSharp, `.editorconfig`, `TreatWarningsAsErrors` | nullable reference types activés |
   | `ai-worker/` | ruff (lint + format) | mypy strict |
   | Dockerfiles | hadolint (`make lint`) | Trivy : misconfigurations + CVE des lockfiles + secrets (`make audit`) |
 

@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/VerbatimIntelligence.Api/VerbatimIntelligence.Api.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/VerbatimIntelligence.Api.Tests/VerbatimIntelligence.Api.Tests.csproj" />
+  </Folder>
+</Solution>

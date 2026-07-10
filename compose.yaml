@@ -12,7 +12,19 @@ services:
       - ./frontend:/app
       - frontend_node_modules:/app/node_modules
 
+  backend:
+    build:
+      context: backend
+      dockerfile: Dockerfile.dev
+    ports:
+      # Host port 8180, same offset logic as the frontend's 5180.
+      - "8180:8080"
+    volumes:
+      - ./backend:/app
+      - backend_nuget:/home/app/.nuget
+
 volumes:
-  # Masks the bind mount: dependencies are the image's (linux/musl builds),
+  # Mask the bind mount: dependencies are the image's (linux builds),
   # never the host's. Seeded from the image on first start.
   frontend_node_modules:
+  backend_nuget:

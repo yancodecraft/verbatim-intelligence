@@ -1,0 +1,24 @@
+# Dev-only image: source code comes from the compose bind mount, so this
+# image only carries the SDK and the restored NuGet packages. Rebuild it
+# whenever package references change (make rebuild).
+FROM mcr.microsoft.com/dotnet/sdk@sha256:940f919ae84dd92ccd4aab7686fa5b777870b006c9360351039e16bcaad73d89
+
+WORKDIR /app
+RUN chown app:app /app
+USER app
+
+COPY --chown=app:app VerbatimIntelligence.slnx Directory.Build.props ./
+COPY --chown=app:app src/VerbatimIntelligence.Api/VerbatimIntelligence.Api.csproj src/VerbatimIntelligence.Api/
+COPY --chown=app:app tests/Directory.Build.props tests/VerbatimIntelligence.Api.Tests/VerbatimIntelligence.Api.Tests.csproj tests/VerbatimIntelligence.Api.Tests/
+RUN dotnet restore VerbatimIntelligence.slnx
+
+ENV ASPNETCORE_URLS=http://0.0.0.0:8080
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=30s \
+  CMD wget -qO /dev/null http://127.0.0.1:8080/health || exit 1
+
+# --no-hot-reload: minimal-API routes live in top-level code, which hot
+# reload patches without effect (ENC0118) — a silent trap. A full restart
+# on save is deterministic. Revisit when routes move to their own files.
+CMD ["dotnet", "watch", "run", "--project", "src/VerbatimIntelligence.Api", "--no-launch-profile", "--no-hot-reload"]

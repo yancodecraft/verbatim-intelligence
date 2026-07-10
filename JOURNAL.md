@@ -6,6 +6,56 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-10 — Naissance du backend
+
+**Fait :** deuxième brique — `backend/` (ASP.NET Core minimal API, .NET 10
+LTS, SDK 10.0.301) avec un seul endpoint `GET /health`, écrit en TDD : le
+test d'intégration (`WebApplicationFactory`) a échoué avant que l'endpoint
+existe. Solution au format `.slnx` (le nouveau défaut du SDK 10), projet
+API + projet de tests xUnit, branchée au compose (port hôte 8180) avec
+reload-sur-sauvegarde vérifié à travers le bind mount. Commandes
+d'initialisation exactes (image `mcr.microsoft.com/dotnet/sdk@sha256:940f…3d89`) :
+
+```sh
+dotnet new sln -n VerbatimIntelligence -o backend   # produit un .slnx
+dotnet new webapi -o backend/src/VerbatimIntelligence.Api
+dotnet new xunit -o backend/tests/VerbatimIntelligence.Api.Tests
+dotnet new editorconfig -o backend
+dotnet new gitignore -o backend
+dotnet sln backend/VerbatimIntelligence.slnx add backend/src/... backend/tests/...
+dotnet add backend/tests/... reference backend/src/...
+dotnet add backend/tests/... package Microsoft.AspNetCore.Mvc.Testing
+```
+
+**La politique zéro warning a mordu dès le scaffold** (`Directory.Build.props` :
+`TreatWarningsAsErrors`, `AnalysisLevel=latest-recommended`,
+`EnforceCodeStyleInBuild`) :
+- NU1903 : le transitif `Microsoft.OpenApi` 2.0.0 porte une CVE haute
+  sévérité — remonté en référence directe 2.10.0, à retirer quand
+  `Microsoft.AspNetCore.OpenApi` tirera une version corrigée.
+- CA1707 neutralisée sur les seuls projets de tests (les underscores dans
+  les noms de tests sont la convention xUnit).
+
+**Décision — le build est le linter.** Sur .NET, l'analyse vit dans le
+compilateur : `make lint` fait donc un `dotnet build` (tous les analyzers +
+audit NuGet), `dotnet format --verify-no-changes` ne gardant que la porte
+« rien de non-formaté ». En profondeur au-delà du SDK : un seul pack tiers,
+**SonarAnalyzer.CSharp** (bugs, smells, sécurité) — Roslynator ou Meziantou
+seulement si des manques réels apparaissent, même logique anti-double-emploi
+que Trivy. Ses premières prises sur le scaffold : S6966 (`await
+app.RunAsync()` plutôt que `Run()`) et S1118 (constructeur protégé sur la
+classe `Program` exposée aux tests).
+
+**Décision — `dotnet watch --no-hot-reload` :** le hot reload .NET patche
+le code top-level sans effet jusqu'au restart (ENC0118) — or nos routes
+minimal API vivent précisément là : un endpoint ajouté ne répondrait
+jamais, piège silencieux. Un restart complet à chaque sauvegarde est
+déterministe. À revoir quand les routes quitteront `Program.cs`.
+
+Piège vécu sur le volume NuGet : ensemencé une première fois en root, il
+était illisible pour l'utilisateur non-root du conteneur — `make rebuild`
+(purge des volumes de deps) est la réponse standard à ce genre d'état.
+
 ## 2026-07-10 — Trivy comme scanner sécurité unique
 
 **Décision :** Trivy seul pour la sécurité (`make audit`), challengé contre

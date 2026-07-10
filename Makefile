@@ -8,9 +8,10 @@ TRIVY_IMAGE = aquasec/trivy@sha256:cffe3f5161a47a6823fbd23d985795b3ed72a4c806da4
 
 # Named volumes holding in-container dependencies. They are seeded from the
 # image only on first creation, so they must be dropped on rebuild.
-DEP_VOLUMES = verbatim-intelligence_frontend_node_modules
+DEP_VOLUMES = verbatim-intelligence_frontend_node_modules \
+              verbatim-intelligence_backend_nuget
 
-.PHONY: help up down rebuild logs ps lint audit outdated
+.PHONY: help up down rebuild logs ps lint audit test outdated
 
 help: ## List available targets
 	@grep -E '^[a-z][a-zA-Z_-]*:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -32,13 +33,20 @@ logs: ## Tail all container logs
 ps: ## Show container status
 	docker compose ps
 
-lint: ## Run all linters (frontend Biome, Dockerfiles hadolint)
+lint: ## Run all linters (frontend Biome, backend dotnet format, Dockerfiles hadolint)
 	docker compose run --rm --no-deps frontend npm run lint
-	docker run --rm -v "$(CURDIR)":/repo -w /repo $(HADOLINT_IMAGE) hadolint frontend/Dockerfile.dev
+	docker compose run --rm --no-deps backend dotnet build VerbatimIntelligence.slnx
+	docker compose run --rm --no-deps backend dotnet format VerbatimIntelligence.slnx --verify-no-changes
+	docker run --rm -v "$(CURDIR)":/repo -w /repo $(HADOLINT_IMAGE) hadolint frontend/Dockerfile.dev backend/Dockerfile.dev
 
 audit: ## Security checks (Trivy: misconfigurations + lockfile CVEs)
 	docker run --rm -v "$(CURDIR)":/repo -w /repo $(TRIVY_IMAGE) config --exit-code 1 .
 	docker run --rm -v "$(CURDIR)":/repo -w /repo $(TRIVY_IMAGE) fs --exit-code 1 --scanners vuln,secret .
 
+test: ## Run all tests
+	docker compose run --rm --no-deps frontend npm run test:unit -- --run
+	docker compose run --rm --no-deps backend dotnet test VerbatimIntelligence.slnx
+
 outdated: ## Report outdated dependencies per brick
 	-docker compose run --rm --no-deps frontend npm outdated
+	-docker compose run --rm --no-deps backend dotnet list VerbatimIntelligence.slnx package --outdated

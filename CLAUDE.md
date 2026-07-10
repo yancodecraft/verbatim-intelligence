@@ -18,10 +18,9 @@ Ce qu'on sait déjà : ce sera une **app SaaS, sur le web**.
 
 ## Où on en est
 
-C'est le début. Les prochaines étapes, dans l'ordre :
-
-1. **Définir ce qu'on veut** — le produit précis : personas, parcours, périmètre de la
-   première version, ce qu'on ne fait pas.
+1. ~~**Définir ce qu'on veut**~~ — fait : voir [docs/v1-spec.md](docs/v1-spec.md)
+   (persona, parcours V1, périmètre, non-goals).
 2. **Définir comment on va le faire** — architecture, stack, découpage du travail.
+   ← on en est là.
 
 Rien d'autre n'est figé à ce stade.

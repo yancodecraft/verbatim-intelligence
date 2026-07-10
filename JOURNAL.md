@@ -6,6 +6,23 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-10 — Le squelette est visible à l'écran, et un e2e le prouve
+
+**Fait :** la page d'accueil gagne le bouton « Create analysis »
+(`CreateAnalysis.vue`, TDD : trois tests Vitest à timers simulés — création,
+polling jusqu'à l'état terminal puis arrêt, erreur réseau). Le statut est
+pollé chaque seconde jusqu'à `succeeded`/`failed`. Et le **premier parcours
+e2e Playwright** de la tranche : un conteneur Playwright (image épinglée,
+version alignée sur `@playwright/test`) rejoint le réseau compose, ouvre la
+page servie par le conteneur frontend, clique, et attend que l'analyse
+traverse API → Postgres → Redis → worker jusqu'à `succeeded` — 1,6 s en
+réel. `make e2e` (la stack doit tourner : `make up`).
+
+**Décision :** le e2e s'exécute contre la **vraie stack de dev**, pas un
+serveur éphémère — c'est la traversée réelle qu'on veut prouver, et c'est le
+même parcours que la CI rejouera. Vite doit accepter l'hôte `frontend`
+(`server.allowedHosts`) pour être joignable depuis le réseau compose.
+
 ## 2026-07-10 — La file Redis relie backend et worker : le squelette a une colonne vertébrale
 
 **Fait :** Redis 8 dans le compose (mot de passe même en dev, **aucun

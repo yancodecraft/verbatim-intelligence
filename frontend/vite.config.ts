@@ -12,6 +12,8 @@ export default defineConfig({
 		},
 	},
 	server: {
+		// The e2e container reaches the dev server as http://frontend:5173.
+		allowedHosts: ["frontend"],
 		// Same routing contract as the production reverse proxy: the app
 		// calls /api/*, the proxy strips the prefix and forwards to the
 		// backend — no CORS anywhere.

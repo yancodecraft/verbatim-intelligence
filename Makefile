@@ -5,6 +5,8 @@
 # Pinned tooling images (see docs/practices.md — tooling images are pinned).
 HADOLINT_IMAGE = hadolint/hadolint@sha256:27086352fd5e1907ea2b934eb1023f217c5ae087992eb59fde121dce9c9ff21e
 TRIVY_IMAGE = aquasec/trivy@sha256:cffe3f5161a47a6823fbd23d985795b3ed72a4c806da4c4df16266c02accdd6f
+# Keep in sync with @playwright/test in frontend/package.json.
+PLAYWRIGHT_IMAGE = mcr.microsoft.com/playwright@sha256:5b8f294aff9041b7191c34a4bab3ac270157a28774d4b0660e9743297b697e48
 
 # Named volumes holding in-container dependencies. They are seeded from the
 # image only on first creation, so they must be dropped on rebuild.
@@ -12,7 +14,7 @@ DEP_VOLUMES = verbatim-intelligence_frontend_node_modules \
               verbatim-intelligence_backend_nuget \
               verbatim-intelligence_ai_worker_venv
 
-.PHONY: help up down rebuild logs ps psql lint audit test outdated
+.PHONY: help up down rebuild logs ps psql lint audit test e2e outdated
 
 help: ## List available targets
 	@grep -E '^[a-z][a-zA-Z_-]*:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -65,6 +67,13 @@ test: ## Run all tests
 	  -v /var/run/docker.sock:/var/run/docker.sock \
 	  -e TESTCONTAINERS_HOST_OVERRIDE=host.docker.internal \
 	  ai-worker uv run --frozen --no-sync pytest
+
+e2e: ## Run the e2e suite against the live dev stack (needs make up)
+	docker run --rm --network verbatim-intelligence_default \
+	  -e PLAYWRIGHT_BASE_URL=http://frontend:5173 \
+	  -v "$(CURDIR)/frontend":/work \
+	  -v verbatim-intelligence_frontend_node_modules:/work/node_modules \
+	  -w /work $(PLAYWRIGHT_IMAGE) npx playwright test
 
 outdated: ## Report outdated dependencies per brick
 	-docker compose run --rm --no-deps frontend npm outdated

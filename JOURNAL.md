@@ -6,6 +6,34 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-10 — La file Redis relie backend et worker : le squelette a une colonne vertébrale
+
+**Fait :** Redis 8 dans le compose (mot de passe même en dev, **aucun
+volume** : la file est un pur transport, l'état vit en base). Le
+`POST /analyses` pousse l'id dans `analyses:pending` **après** le commit en
+base ; le worker fait un `BLPOP`, un **claim atomique**
+(`UPDATE … WHERE status = 'pending' … RETURNING`) puis passe l'analyse en
+`succeeded` (le vrai pipeline attendra le spike). TDD des deux côtés :
+côté C#, le test vérifie l'id dans la file (Testcontainers Redis) ; côté
+Python, cinq tests couvrent pop/claim/complete — dont « une analyse déjà
+`running` n'est pas re-claimable » et « un id malformé est ignoré ».
+Vérifié en réel : POST depuis le front → `succeeded` en ~50 ms, file vide.
+
+**Deux leçons de la première exécution réelle :**
+- **redis-py 8 pose un socket timeout par défaut** : un `BLPOP` bloquant
+  doit avoir un socket timeout supérieur au timeout serveur, sinon le
+  client abandonne avant la réponse.
+- **La boucle du worker mourait sur la première erreur transitoire**,
+  conteneur toujours « healthy » — le silent failure type. La boucle
+  attrape désormais les erreurs de dépendances, loggue et réessaie ; seul
+  un bug inattendu la tue. La leçon rejoint la résilience déjà actée
+  (claim/heartbeat/reaper, tranche 4).
+
+La clé `analyses:pending` est un contrat entre briques
+(`RedisKeys.PendingAnalyses` en C#, `PENDING_ANALYSES_KEY` en Python) —
+comme le schéma. Un id poussé mais jamais consommé reste `pending` en
+base : c'est le reaper qui remettra ces orphelines en file (tranche 4).
+
 ## 2026-07-10 — Naissance de l'ai-worker
 
 **Fait :** troisième brique — `ai-worker/` (Python 3.14, gestion **uv**,

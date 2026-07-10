@@ -23,11 +23,14 @@ services:
       - ./backend:/app
       - backend_nuget:/home/app/.nuget
     environment:
-      # Dev-only credentials, matching the postgres service below.
+      # Dev-only credentials, matching the postgres and redis services below.
       ConnectionStrings__Database: "Host=postgres;Database=verbatim;Username=verbatim;Password=verbatim"
+      ConnectionStrings__Redis: "redis:6379,password=verbatim"
       Database__MigrateOnStartup: "true"
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   ai-worker:
@@ -35,14 +38,28 @@ services:
       context: ai-worker
       dockerfile: Dockerfile.dev
     environment:
-      # Dev-only credentials, matching the postgres service below.
+      # Dev-only credentials, matching the postgres and redis services below.
       DATABASE_URL: "postgresql://verbatim:verbatim@postgres:5432/verbatim"
+      REDIS_URL: "redis://:verbatim@redis:6379/0"
     volumes:
       - ./ai-worker:/app
       - ai_worker_venv:/app/.venv
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:8-alpine@sha256:9d317178eceac8454a2284a9e6df2466b93c745529947f0cd42a0fa9609d7005
+    # Password even in dev, for parity with production. The queue is pure
+    # transport (analysis ids only) — no data volume: state lives in Postgres.
+    command: ["redis-server", "--requirepass", "verbatim"]
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=verbatim redis-cli ping | grep PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   postgres:
     image: postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15

@@ -2,6 +2,8 @@ using System.Text.Json.Serialization;
 
 using Microsoft.EntityFrameworkCore;
 
+using StackExchange.Redis;
+
 using VerbatimIntelligence.Api.Analyses;
 using VerbatimIntelligence.Api.Data;
 
@@ -13,6 +15,9 @@ builder.Services.AddDbContext<AppDbContext>(options => options
     .UseNpgsql(builder.Configuration.GetConnectionString("Database")
         ?? throw new InvalidOperationException("Missing ConnectionStrings:Database"))
     .UseSnakeCaseNamingConvention());
+builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
+    ConnectionMultiplexer.Connect(builder.Configuration.GetConnectionString("Redis")
+        ?? throw new InvalidOperationException("Missing ConnectionStrings:Redis")));
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(
         new JsonStringEnumConverter(System.Text.Json.JsonNamingPolicy.CamelCase)));

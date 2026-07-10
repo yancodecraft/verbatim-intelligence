@@ -40,6 +40,22 @@ public class AnalysesEndpointsTests(ApiFactory factory) : IClassFixture<ApiFacto
     }
 
     [Fact]
+    public async Task PostAnalyses_EnqueuesAnalysisId()
+    {
+        var client = factory.CreateClient();
+
+        var created = await (await client.PostAsync("/analyses", content: null))
+            .Content.ReadFromJsonAsync<AnalysisResponse>();
+        Assert.NotNull(created);
+
+        await using var redis = await StackExchange.Redis.ConnectionMultiplexer
+            .ConnectAsync(factory.RedisConnectionString);
+        var queued = await redis.GetDatabase()
+            .ListRangeAsync(Analyses.RedisKeys.PendingAnalyses);
+        Assert.Contains(created.Id.ToString(), queued.Select(value => (string?)value));
+    }
+
+    [Fact]
     public async Task GetAnalyses_ReturnsNotFoundForUnknownId()
     {
         var client = factory.CreateClient();

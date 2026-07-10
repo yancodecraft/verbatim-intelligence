@@ -8,12 +8,21 @@ bout en bout, se termine testée et déployée, et laisse le produit démontrabl
 
 ## Définition de « fini »
 
-Une tranche est finie quand :
+La définition canonique (quatre critères, dont la revue de code par agent)
+est dans [practices.md](practices.md#définition-de--fini-) — elle s'applique
+à chaque tranche.
 
-1. Ses tests passent en CI (TDD sur backend et worker ; tests ciblés + un
-   parcours e2e Playwright côté front).
-2. Le parcours a été exercé réellement sur l'environnement déployé.
-3. Elle est en production (déploiement continu depuis `main`).
+## Le spike pipeline — mené en parallèle de la tranche 1
+
+Un spike n'est pas une tranche (voir le [glossaire](glossary.md)) : rien
+n'est livré, on lève un risque. Le plus gros risque du produit est la
+qualité des thèmes et des synthèses ; il se vérifie avant d'industrialiser
+quoi que ce soit. Un **script Python autonome et jetable** (hors des
+briques, non déployé) fait tourner le pipeline LLM sur un corpus réel : il
+tranche la stratégie de regroupement, mesure un ordre de grandeur de coût
+et de latence par analyse, et se juge sur un golden corpus avec des
+attentes écrites. Sa conclusion est consignée au [journal](../JOURNAL.md)
+avant la tranche 4 — c'est elle qu'on industrialise, pas une hypothèse.
 
 ## Les tranches, dans l'ordre
 
@@ -22,9 +31,11 @@ Une tranche est finie quand :
 Le produit ne fait rien, mais tout le reste s'y verse.
 
 - Monorepo initialisé : `frontend/` (Vue 3 + Vite + TS), `backend/`
-  (ASP.NET Core), `ai-worker/` (Python), `compose.yaml` (Postgres + Redis).
+  (ASP.NET Core), `ai-worker/` (Python), `compose.yaml` (Postgres + Redis +
+  les trois briques).
 - Traversée minimale : le front affiche un statut servi par le back ; le back
-  publie un job factice ; le worker le consomme et écrit en base.
+  crée une analyse vide et la met en file ; le worker la consomme et fait
+  évoluer son statut en base.
 - CI dès le premier jour avec les trois volets par brique : **lint** (Biome /
   analyzers Roslyn + `dotnet format` / ruff + mypy), **tests**, **build**
   d'images Docker.
@@ -34,26 +45,34 @@ Le produit ne fait rien, mais tout le reste s'y verse.
 
 ### 2. Auth
 
-Comptes (email + mot de passe ou magic link), sessions, et scoping : toute
-donnée créée ensuite appartient à un compte. Faite tôt pour que chaque
-tranche suivante naisse scopée — zéro rétrofit.
+Comptes par **magic link** (pas de mots de passe : rien à stocker, pas de
+reset, pas de brute-force), sessions, et scoping mécanique : identifiants
+exposés en UUID, filtrage par compte en un point unique, un test
+d'autorisation par endpoint. Faite tôt pour que chaque tranche suivante
+naisse scopée — zéro rétrofit.
 
 ### 3. Ingestion CSV
 
-Upload d'un fichier, aperçu des colonnes, mapping (colonne verbatim +
-métadonnées optionnelles), insertion des verbatims en base. Limites et
-messages d'erreur propres (fichier invalide, vide, trop gros).
+Upload d'un fichier sous le contrat CSV de la [spec](v1-spec.md) (UTF-8,
+délimiteur auto-détecté, limites), aperçu des colonnes, désignation de la
+colonne verbatim, insertion des verbatims en base. Rejet propre avec message
+clair (fichier invalide, vide, trop gros) ; le contenu verbatim est traité
+comme non fiable dès cette tranche (échappement à l'affichage).
 
 ### 4. Pipeline d'analyse
 
 Le cœur du produit — placé au plus tôt car c'est le plus gros risque :
 la qualité des thèmes et des synthèses fait ou défait la proposition de valeur.
 
-- Publication d'un job d'analyse, consommation par le worker.
+- Industrialisation de la stratégie validée par le spike pipeline.
+- L'analyse est mise en file par le backend, consommée par le worker (claim
+  atomique, heartbeat, reaper, pipeline idempotent — voir
+  [architecture.md](architecture.md)).
 - Batching des verbatims, découverte des thèmes émergents, consolidation,
-  synthèse par thème avec verbatims représentatifs **mot pour mot**.
-- Progression écrite en base au fil de l'eau ; gestion des échecs (reprise,
-  job en erreur visible).
+  synthèses avec verbatims représentatifs sélectionnés **par référence**
+  (le LLM retourne des ids ; la fidélité est testée, pas espérée).
+- Progression écrite en base au fil de l'eau ; échec visible avec son
+  erreur ; coût plafonné par analyse.
 
 ### 5. Restitution
 

@@ -15,34 +15,45 @@ des intégrations, ni apprendre un produit complexe.
 
 Un parcours unique, de bout en bout :
 
-1. **Créer un compte / se connecter** — auth simple (email), chaque compte voit
-   uniquement ses propres analyses.
+1. **Créer un compte / se connecter** — par magic link (e-mail), sans mot de
+   passe. Chaque compte voit uniquement ses propres analyses.
 2. **Uploader un CSV** de verbatims (jusqu'à ~5 000 lignes).
-3. **Mapper les colonnes** — aperçu du fichier, l'utilisateur désigne la colonne
-   contenant le verbatim, plus éventuellement une ou deux colonnes de
-   métadonnées (date, score, segment). Aucun format imposé.
+3. **Mapper la colonne verbatim** — aperçu du fichier, l'utilisateur désigne
+   la colonne contenant le verbatim. Rien d'autre : les métadonnées (date,
+   score, segment) ne sont pas collectées tant que rien ne les consomme.
 4. **Lancer l'analyse** — progression visible pendant le traitement.
 5. **Explorer les thèmes émergents** — les verbatims sont regroupés par thèmes
    découverts dans le corpus (pas de taxonomie prédéfinie), chaque thème étant
    pondéré par son volume.
 6. **Lire la synthèse de chaque thème** — un résumé fidèle, accompagné des
-   verbatims représentatifs **mot pour mot**. Chaque affirmation de synthèse
-   doit être traçable vers des verbatims réels : pas de paraphrase présentée
-   comme citation.
+   verbatims représentatifs **mot pour mot**. Un verbatim cité est une
+   **référence à la ligne d'origine du corpus** — jamais un texte régénéré :
+   la fidélité est un invariant vérifié par le système, pas une promesse de
+   prompt.
 7. **Partager le rapport** — un lien public en lecture seule, à token non
-   devinable et révocable, qui montre l'analyse complète sans compte.
+   devinable, révocable et non indexable, qui montre l'analyse complète sans
+   compte.
 
 ## Décisions de périmètre
 
-- **Ingestion : CSV uniquement.** C'est l'unique porte d'entrée ; « exportez en
-  CSV » couvre la quasi-totalité des sources du persona.
+- **Ingestion : CSV uniquement**, sous contrat explicite : UTF-8 (BOM toléré),
+  délimiteur auto-détecté (`,` ou `;`), limites de taille, de lignes et de
+  longueur de cellule, rejet propre avec message clair. « Exportez en CSV »
+  couvre la quasi-totalité des sources du persona.
 - **Volume : ~5 000 verbatims par import**, traités proprement (batching, coût
-  maîtrisé, progression visible).
+  plafonné par analyse, progression visible).
 - **Langue : UI en anglais.** Les synthèses sont produites dans la langue
   dominante du corpus, pour que citations et résumés restent dans la même
   langue.
-- **Fidélité avant exhaustivité.** Un verbatim cité est toujours exact ; si un
-  thème est incertain, on le dit plutôt que de lisser.
+- **Fidélité avant exhaustivité.** Un verbatim cité est toujours exact — par
+  construction (référence à la ligne d'origine, jamais de texte régénéré) ;
+  si un thème est incertain, on le dit plutôt que de lisser.
+- **Les verbatims sont des données personnelles de tiers.** Les retours
+  clients contiennent presque toujours des données personnelles des clients
+  de nos utilisateurs. Conséquences V1 : traitement via l'API Anthropic en
+  zero-data-retention, information claire à l'upload (« contenu traité par un
+  service tiers »), suppression en cascade (corpus → analyse → partages) à la
+  demande, et jamais de corpus réel dans le repo ou les fixtures.
 
 ## Non-goals V1
 

@@ -53,9 +53,10 @@ niveaux :
 
   | Brique | Lint + format | Types / analyse |
   |---|---|---|
-  | `frontend/` | Biome (+ `eslint-plugin-vue` si des règles SFC manquent) | `vue-tsc` en CI |
+  | `frontend/` | Biome (`noUnusedImports`/`noUnusedVariables` désactivées sur `*.vue` : Biome n'analyse que le bloc script, pas le template) | `vue-tsc` en CI |
   | `backend/` | Analyzers Roslyn (`AnalysisLevel=latest`, `EnforceCodeStyleInBuild`), `.editorconfig`, `TreatWarningsAsErrors` | nullable reference types activés |
   | `ai-worker/` | ruff (lint + format) | mypy strict |
+  | Dockerfiles | hadolint (`make lint`) | Trivy : misconfigurations + CVE des lockfiles + secrets (`make audit`) |
 
 - **Hooks pre-commit locaux** : lint + format avant chaque commit — la CI
   n'est jamais le premier filet.
@@ -72,6 +73,13 @@ niveaux :
   projet — hooks, scripts, linters, tests, briques en dev — s'exécute dans
   des conteneurs : contribuer ne requiert aucun runtime installé localement
   (ni Python, ni Node, ni .NET). Les images d'outillage sont épinglées.
+  Le `Makefile` racine est l'interface de dev (`make up`, `make down`,
+  `make logs`, …) : une façade dont chaque cible délègue à `docker compose` —
+  `make` est livré avec l'OS, ce n'est pas une dépendance de plus.
+- **Même l'initialisation des briques passe par des conteneurs** : les
+  scaffolds officiels (`npm create vue`, `dotnet new`, …) sont exécutés dans
+  l'image du runtime concerné, montée sur le repo — les commandes exactes
+  sont consignées au journal.
 
 ## Conception
 

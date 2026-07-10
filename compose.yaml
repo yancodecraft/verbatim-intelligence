@@ -1,0 +1,18 @@
+# Development stack. Source directories are bind-mounted into the containers
+# for hot reload; dependencies live in named volumes built into the images.
+services:
+  frontend:
+    build:
+      context: frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      # Host port 5180: 5173 tends to be taken by other Vite projects.
+      - "5180:5173"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+
+volumes:
+  # Masks the bind mount: dependencies are the image's (linux/musl builds),
+  # never the host's. Seeded from the image on first start.
+  frontend_node_modules:

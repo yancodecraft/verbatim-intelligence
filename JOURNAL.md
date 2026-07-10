@@ -6,6 +6,69 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-10 — Trivy comme scanner sécurité unique
+
+**Décision :** Trivy seul pour la sécurité (`make audit`), challengé contre
+les spécialistes. L'alternative « best of breed » — Grype (CVE) + Checkov
+(misconfigurations) + Gitleaks (secrets) — gagne chaque discipline mais
+coûte trois images à maintenir, trois formats de sortie, trois sources de
+faux positifs. Trivy est assez bon sur les quatre besoins (misconfig
+Dockerfile/compose, CVE des lockfiles, secrets, et demain le scan des
+images en CI), OSS Apache 2.0, standard de facto. Même logique que Redis
+vs RabbitMQ : pas de double emploi. Faiblesses assumées : les secrets ne
+sont scannés que sur l'arbre de travail, pas l'historique git (la push
+protection GitHub couvre ce trou) ; les checks de misconfig sont moins
+riches que Checkov (hadolint compense sur les Dockerfiles). **À rouvrir
+si** : des contributeurs externes arrivent (→ Gitleaks, l'historique
+devient une surface) ou du vrai IaC apparaît (→ Checkov).
+
+## 2026-07-10 — Naissance du frontend, compose de dev et Makefile
+
+**Fait :** la première brique tourne — `frontend/` (Vue 3 + Vite + TS +
+vue-router + Vitest, Biome en linter/formateur — pas d'ESLint/Prettier),
+servie par le `compose.yaml` de dev avec hot reload vérifié à travers le
+bind mount, et pilotée par un `Makefile` en façade
+(`make up|down|rebuild|logs|ps|lint|audit|outdated`).
+
+**Décision :** monter la stack brique par brique, chaque composant vérifié
+seul avant d'être relié au suivant (front → back → base → worker → file),
+plutôt qu'un squelette monté d'un bloc. Chaque brique est initialisée avec
+son outillage officiel, exécuté dans un conteneur — Docker reste la seule
+dépendance locale — après vérification des versions : runtime sur la LTS
+active (Node 24, pas la maintenance 22), dépendances scaffoldées contrôlées
+à jour (`npm outdated`). Commandes d'initialisation exactes :
+
+```sh
+docker run --rm -v "$PWD":/work -w /work \
+  node:24-alpine@sha256:a0b9bf06e4e6…fbfd \
+  sh -c "npm create --yes vue@latest frontend -- --ts --router --vitest"
+
+docker run --rm -v "$PWD/frontend":/app -w /app \
+  node:24-alpine@sha256:a0b9bf06e4e6…fbfd \
+  npm install --package-lock-only --ignore-scripts
+
+docker run --rm -v "$PWD/frontend":/app -w /app \
+  node:24-alpine@sha256:a0b9bf06e4e6…fbfd \
+  npm install -D --package-lock-only --ignore-scripts @biomejs/biome@2.5.3
+```
+
+**Qualité et sécurité dès la première brique :**
+- Biome sur les défauts (le scaffold est reformaté une fois), avec un
+  override sur `*.vue` : `noUnusedImports`/`noUnusedVariables` désactivées —
+  Biome n'analyse que le bloc script, les imports du template sont des faux
+  positifs.
+- hadolint sur les Dockerfiles (`make lint`), Trivy en misconfigurations +
+  CVE + secrets (`make audit`) — leurs premières passes ont imposé l'image
+  épinglée, `USER node` (non-root) et un `HEALTHCHECK` (sur `127.0.0.1` :
+  busybox wget résout `localhost` en `::1`, Vite n'écoute qu'en IPv4).
+
+Choix du `Dockerfile.dev` : les dépendances sont installées dans l'image
+(`npm ci`, reproductible) et un volume nommé masque `node_modules` sous le
+bind mount — jamais les modules de l'hôte dans le conteneur ; le volume
+n'étant ensemencé qu'à sa création, `make rebuild` le supprime après un
+changement de dépendances. Port hôte 5180 (5173 est souvent pris par
+d'autres projets Vite).
+
 ## 2026-07-10 — Docker comme seule dépendance locale
 
 **Décision :** contribuer au projet ne requiert que git et Docker. Tout

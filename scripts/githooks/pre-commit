@@ -1,0 +1,32 @@
+#!/bin/sh
+# Pre-commit: deterministic docs consistency checks, executed in a container.
+# Local requirements: git + Docker, nothing else.
+# Install once: git config core.hooksPath scripts/githooks
+set -e
+
+# Pinned by digest (practices: tooling images are pinned). To update:
+#   docker pull python:3.13-alpine
+#   docker inspect --format='{{index .RepoDigests 0}}' python:3.13-alpine
+IMAGE="python:3.13-alpine@sha256:399babc8b49529dabfd9c922f2b5eea81d611e4512e3ed250d75bd2e7683f4b0"
+
+ROOT="$(git rev-parse --show-toplevel)"
+STAGED_FILES="$(git diff --cached --name-only)"
+export STAGED_FILES
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "pre-commit: docker is required (the project's only local dependency)" >&2
+  exit 1
+fi
+if ! docker info >/dev/null 2>&1; then
+  echo "pre-commit: docker is installed but the daemon is not responding — start Docker" >&2
+  exit 1
+fi
+
+docker image inspect "$IMAGE" >/dev/null 2>&1 || docker pull -q "$IMAGE" >/dev/null
+
+exec docker run --rm \
+  -v "$ROOT:/repo:ro" \
+  -w /repo \
+  -e STAGED_FILES \
+  "$IMAGE" \
+  python scripts/check_docs.py

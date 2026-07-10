@@ -33,7 +33,7 @@ def main() -> NoReturn:
         # dependency errors are logged and retried, never fatal.
         try:
             _consume(client, database_url)
-        except (psycopg.OperationalError, redis.exceptions.RedisError):
+        except psycopg.OperationalError, redis.exceptions.RedisError:
             logger.exception(
                 "dependency unavailable, retrying in %ss", RETRY_DELAY_SECONDS
             )

@@ -6,6 +6,28 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-10 — La CI est le Makefile
+
+**Fait :** `make ci` enchaîne tout le pipeline en local — lint, tests,
+build des images, stack up, e2e, audit — et sort à 0. Le workflow GitHub
+Actions (`.github/workflows/ci.yml`) n'est qu'un **mince orchestrateur de
+ces mêmes cibles make** : chaque job rejoue une commande exécutable sur
+n'importe quel poste. Vert sur un laptop = vert en CI, et réciproquement —
+pas de logique de pipeline enfermée dans le YAML. Dependabot activé (npm,
+NuGet, uv, Docker, Actions), promis dans les pratiques depuis le début.
+
+**Décisions :**
+- Étages à feedback croissant : lint / tests / audit en parallèle, le e2e
+  (le plus lent) ne part que si lint et tests passent.
+- Actions épinglées par SHA de commit, pas par tag mutable — même logique
+  que les digests d'images.
+- `host.docker.internal` déclaré via `extra_hosts: host-gateway` dans le
+  compose : les tests Testcontainers joignent les ports publiés sur l'hôte
+  Docker, y compris sur un runner Linux nu.
+
+Trouvaille en passant : le formateur ruff normalise vers la nouvelle
+syntaxe Python 3.14 (PEP 758) — `except A, B:` sans parenthèses.
+
 ## 2026-07-10 — Le squelette est visible à l'écran, et un e2e le prouve
 
 **Fait :** la page d'accueil gagne le bouton « Create analysis »

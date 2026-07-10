@@ -14,7 +14,7 @@ DEP_VOLUMES = verbatim-intelligence_frontend_node_modules \
               verbatim-intelligence_backend_nuget \
               verbatim-intelligence_ai_worker_venv
 
-.PHONY: help up down rebuild logs ps psql lint audit test e2e outdated
+.PHONY: help up down rebuild logs ps psql lint audit test e2e ci outdated
 
 help: ## List available targets
 	@grep -E '^[a-z][a-zA-Z_-]*:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -74,6 +74,16 @@ e2e: ## Run the e2e suite against the live dev stack (needs make up)
 	  -v "$(CURDIR)/frontend":/work \
 	  -v verbatim-intelligence_frontend_node_modules:/work/node_modules \
 	  -w /work $(PLAYWRIGHT_IMAGE) npx playwright test
+
+# The CI pipeline, runnable locally: GitHub Actions orchestrates these same
+# targets — anything green here is green there.
+ci: ## Run the full pipeline: lint, tests, build, e2e, audit
+	$(MAKE) lint
+	$(MAKE) test
+	docker compose build
+	$(MAKE) up
+	$(MAKE) e2e
+	$(MAKE) audit
 
 outdated: ## Report outdated dependencies per brick
 	-docker compose run --rm --no-deps frontend npm outdated

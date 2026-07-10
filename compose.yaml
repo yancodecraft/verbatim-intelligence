@@ -27,6 +27,10 @@ services:
       ConnectionStrings__Database: "Host=postgres;Database=verbatim;Username=verbatim;Password=verbatim"
       ConnectionStrings__Redis: "redis:6379,password=verbatim"
       Database__MigrateOnStartup: "true"
+    # Lets Testcontainers-driven test runs reach ports published on the
+    # Docker host, including on plain Linux (CI runners).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy
@@ -41,6 +45,8 @@ services:
       # Dev-only credentials, matching the postgres and redis services below.
       DATABASE_URL: "postgresql://verbatim:verbatim@postgres:5432/verbatim"
       REDIS_URL: "redis://:verbatim@redis:6379/0"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./ai-worker:/app
       - ai_worker_venv:/app/.venv

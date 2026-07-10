@@ -1,0 +1,54 @@
+[project]
+name = "ai-worker"
+version = "0.1.0"
+description = "Consumes pending analyses and runs the LLM pipeline"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "psycopg[binary]>=3.3.4",
+]
+
+[project.scripts]
+ai-worker = "ai_worker:main"
+
+[build-system]
+requires = ["uv_build>=0.9.30,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "mypy>=2.2.0",
+    "pytest>=9.1.1",
+    "ruff>=0.15.21",
+    "testcontainers[postgres]>=4.14.2",
+    "watchfiles>=1.2.0",
+]
+
+[tool.ruff]
+target-version = "py314"
+
+[tool.ruff.lint]
+# Everything on, opt-out beats opt-in for a zero-warning policy.
+select = ["ALL"]
+ignore = [
+    "D",      # docstring-everywhere is noise; comments where they earn it
+    "COM812", # conflicts with the ruff formatter
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+    "S101",    # pytest asserts
+    "PLR2004", # literal expected values in assertions
+    "INP001",  # pytest test dirs are not packages
+]
+
+[tool.mypy]
+strict = true
+python_version = "3.14"
+
+[[tool.mypy.overrides]]
+module = "testcontainers.*"
+ignore_missing_imports = true # ships no py.typed marker
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -30,6 +30,20 @@ services:
       postgres:
         condition: service_healthy
 
+  ai-worker:
+    build:
+      context: ai-worker
+      dockerfile: Dockerfile.dev
+    environment:
+      # Dev-only credentials, matching the postgres service below.
+      DATABASE_URL: "postgresql://verbatim:verbatim@postgres:5432/verbatim"
+    volumes:
+      - ./ai-worker:/app
+      - ai_worker_venv:/app/.venv
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   postgres:
     image: postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
     environment:
@@ -54,5 +68,6 @@ volumes:
   # never the host's. Seeded from the image on first start.
   frontend_node_modules:
   backend_nuget:
+  ai_worker_venv:
   # Database data — survives make rebuild (it is not a dependency volume).
   postgres_data:

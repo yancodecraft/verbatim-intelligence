@@ -1,0 +1,21 @@
+# Dev-only image: source code comes from the compose bind mount, so this
+# image only carries uv, Python and the synced virtualenv. Rebuild it
+# whenever dependencies change (make rebuild).
+FROM ghcr.io/astral-sh/uv@sha256:7cf77f594be8042dab6daa9fe326f90962252268b4f120a7f5dccce4d947e6c1
+
+WORKDIR /app
+RUN groupadd --system app && useradd --system --gid app --create-home app \
+    && chown app:app /app
+USER app
+
+# Hardlinks cannot cross the volume boundary between uv's cache and .venv.
+ENV UV_LINK_MODE=copy
+
+COPY --chown=app:app pyproject.toml uv.lock README.md ./
+COPY --chown=app:app src src
+RUN uv sync --frozen
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s \
+  CMD ["/app/.venv/bin/python", "-c", "import os, sys; from ai_worker.database import is_database_ready; sys.exit(0 if is_database_ready(os.environ['DATABASE_URL']) else 1)"]
+
+CMD ["uv", "run", "--frozen", "watchfiles", "--filter", "python", "uv run ai-worker", "src"]

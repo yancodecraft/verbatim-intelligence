@@ -6,6 +6,36 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-10 — Naissance de l'ai-worker
+
+**Fait :** troisième brique — `ai-worker/` (Python 3.14, gestion **uv**,
+lockfile `uv.lock`). À ce stade une boucle placeholder : elle prouve que le
+worker tourne, joint Postgres (`is_database_ready`, TDD contre un Postgres
+Testcontainers) et loggue — la consommation de la file arrive avec Redis.
+Hot reload par **watchfiles** vérifié (édition sur l'hôte → boucle
+relancée). Commandes d'initialisation exactes (image
+`ghcr.io/astral-sh/uv@sha256:7cf7…e6c1`, uv 0.9.30) :
+
+```sh
+uv init --package ai-worker
+uv add 'psycopg[binary]'
+uv add --dev pytest mypy ruff 'testcontainers[postgres]' watchfiles
+```
+
+**Décisions :**
+- **Python 3.14** (dernière stable — pas de notion de LTS en Python) sur
+  base **bookworm-slim**, pas alpine : les wheels binaires (psycopg) sont
+  universels sous glibc, musl reste une loterie.
+- **ruff en `select = ["ALL"]`** : tout activé, exclusions explicites et
+  commentées (opt-out plutôt qu'opt-in, cohérent avec zéro warning) ;
+  mypy strict.
+- Le healthcheck du conteneur réutilise `is_database_ready` : « healthy »
+  signifie « le worker voit la base ».
+
+Piège récurrent des volumes de deps, deuxième occurrence (venv pollué par
+un run root) : les runs de test root passent désormais en `--no-sync`, et
+`make rebuild` reste la remise à zéro standard.
+
 ## 2026-07-10 — La table `analyses` et le lien backend ↔ Postgres
 
 **Fait :** Postgres 18 dans le compose (digest épinglé, aucun port publié —

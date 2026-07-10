@@ -20,7 +20,7 @@ Ce qu'on sait déjà : ce sera une **app SaaS, sur le web**.
 
 1. ~~**Définir ce qu'on veut**~~ — fait : voir [docs/v1-spec.md](docs/v1-spec.md)
    (persona, parcours V1, périmètre, non-goals).
-2. **Définir comment on va le faire** — architecture, stack, découpage du travail.
-   ← on en est là.
+2. **Définir comment on va le faire** — architecture et stack figées : voir
+   [docs/architecture.md](docs/architecture.md). ← reste le découpage du travail.
 
 Rien d'autre n'est figé à ce stade.

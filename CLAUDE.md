@@ -20,7 +20,10 @@ Ce qu'on sait déjà : ce sera une **app SaaS, sur le web**.
 
 1. ~~**Définir ce qu'on veut**~~ — fait : voir [docs/v1-spec.md](docs/v1-spec.md)
    (persona, parcours V1, périmètre, non-goals).
-2. **Définir comment on va le faire** — architecture et stack figées : voir
-   [docs/architecture.md](docs/architecture.md). ← reste le découpage du travail.
+2. ~~**Définir comment on va le faire**~~ — fait : architecture et stack dans
+   [docs/architecture.md](docs/architecture.md), découpage en tranches dans
+   [docs/roadmap.md](docs/roadmap.md).
+3. **Construire, tranche par tranche** — voir la roadmap. ← on en est là
+   (prochaine tranche : squelette marchant + CI/CD + déploiement).
 
-Rien d'autre n'est figé à ce stade.
+Une tranche n'est « finie » que testée, exercée réellement, et déployée.

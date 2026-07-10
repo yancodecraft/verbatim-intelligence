@@ -6,6 +6,24 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-10 — La CI attrape ce que macOS masquait : l'UID du bind mount
+
+**Fait :** premier run GitHub Actions : `test` et `audit` verts du premier
+coup (Testcontainers fonctionne sur les runners), mais `lint` rouge —
+`dotnet build` ne pouvait pas créer `obj/` dans le bind mount. Sur un hôte
+Linux, les fichiers du checkout appartiennent à l'uid du runner et
+l'utilisateur non-root du conteneur ne peut pas y écrire ; Docker Desktop
+sur macOS masque complètement ce problème. Troisième avatar du piège UID —
+cette fois la leçon est structurelle : **rien ne doit écrire dans le bind
+mount**.
+
+**Décision :** les sorties de build vivent hors de l'arbre source. Côté
+.NET, layout « artifacts » (`UseArtifactsOutput`) pointé via
+`ARTIFACTS_PATH` hors du bind mount dans le conteneur ; côté Python, caches
+ruff/mypy déplacés (`RUFF_CACHE_DIR`, `MYPY_CACHE_DIR`) et cache pytest
+désactivé. Bénéfice collatéral : plus aucun `bin/`, `obj/` ou cache ne
+pollue l'arbre de travail, sur aucune machine.
+
 ## 2026-07-10 — La CI est le Makefile
 
 **Fait :** `make ci` enchaîne tout le pipeline en local — lint, tests,

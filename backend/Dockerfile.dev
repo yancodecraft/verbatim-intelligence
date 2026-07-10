@@ -12,6 +12,9 @@ COPY --chown=app:app src/VerbatimIntelligence.Api/VerbatimIntelligence.Api.cspro
 COPY --chown=app:app tests/Directory.Build.props tests/VerbatimIntelligence.Api.Tests/VerbatimIntelligence.Api.Tests.csproj tests/VerbatimIntelligence.Api.Tests/
 RUN dotnet restore VerbatimIntelligence.slnx
 
+# Build artifacts land outside the bind mount (see Directory.Build.props):
+# the source tree is not writable by this user on Linux hosts.
+ENV ARTIFACTS_PATH=/home/app/artifacts
 ENV ASPNETCORE_URLS=http://0.0.0.0:8080
 EXPOSE 8080
 

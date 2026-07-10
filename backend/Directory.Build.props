@@ -9,6 +9,15 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
+  <!-- Single artifacts tree instead of per-project bin/obj. In containers,
+       ARTIFACTS_PATH points it outside the bind mount: the source tree is
+       not writable by the container user on Linux hosts (CI runners), and
+       stays free of build outputs everywhere. -->
+  <PropertyGroup>
+    <UseArtifactsOutput>true</UseArtifactsOutput>
+    <ArtifactsPath Condition="'$(ARTIFACTS_PATH)' != ''">$(ARTIFACTS_PATH)</ArtifactsPath>
+  </PropertyGroup>
+
   <!-- Depth beyond the SDK analyzers: bugs, code smells, security. -->
   <ItemGroup>
     <PackageReference Include="SonarAnalyzer.CSharp" Version="10.29.0.143774" PrivateAssets="all" />

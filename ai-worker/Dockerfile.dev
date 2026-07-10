@@ -10,6 +10,11 @@ USER app
 
 # Hardlinks cannot cross the volume boundary between uv's cache and .venv.
 ENV UV_LINK_MODE=copy
+# Tool caches land outside the bind mount: the source tree is not writable
+# by this user on Linux hosts (CI runners).
+ENV RUFF_CACHE_DIR=/home/app/.cache/ruff
+ENV MYPY_CACHE_DIR=/home/app/.cache/mypy
+ENV PYTEST_ADDOPTS="-p no:cacheprovider"
 
 COPY --chown=app:app pyproject.toml uv.lock README.md ./
 COPY --chown=app:app src src

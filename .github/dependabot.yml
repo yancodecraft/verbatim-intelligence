@@ -20,7 +20,15 @@ updates:
       - "/frontend"
       - "/backend"
       - "/ai-worker"
+      - "/infra/ansible"
       - "/"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "terraform"
+    directories:
+      - "/infra/terraform"
+      - "/infra/terraform/bootstrap"
     schedule:
       interval: "weekly"
 

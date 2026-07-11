@@ -6,6 +6,21 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-11 — La configuration du serveur devient du code : Ansible
+
+**Fait :** `infra/ansible/` décrit tout l'état du serveur — durcissement
+(SSH par clé uniquement, ufw en défense en profondeur derrière le security
+group, fail2ban, mises à jour de sécurité automatiques) et Docker Engine +
+plugin compose depuis le dépôt officiel. `make configure` construit une
+image d'outillage épinglée (ansible-core 2.21.1, collection
+community.general 13.1.0) et rejoue le playbook. **Vérifié en réel deux
+fois** : premier run 8 changements, second run `changed=0` — l'idempotence
+est le test d'un déploiement déclaratif.
+
+**Décision :** aucune commande manuelle sur le serveur ne fait foi. Si un
+réglage doit changer, il change dans un rôle Ansible et se rejoue — la
+machine est reconstructible de zéro (`make infra-apply && make configure`).
+
 ## 2026-07-11 — L'infrastructure devient du code : Terraform sur Scaleway
 
 **Fait :** `infra/terraform/` décrit toute l'infrastructure de prod —

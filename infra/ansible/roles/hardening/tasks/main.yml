@@ -1,0 +1,46 @@
+# Baseline hardening: key-only SSH, host firewall (defense in depth on top
+# of the Scaleway security group), fail2ban, automatic security updates.
+- name: Harden the SSH daemon
+  ansible.builtin.copy:
+    dest: /etc/ssh/sshd_config.d/99-hardening.conf
+    content: |
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PermitRootLogin prohibit-password
+    mode: "0644"
+  notify: Restart ssh
+
+- name: Install fail2ban and unattended-upgrades
+  ansible.builtin.apt:
+    name:
+      - fail2ban
+      - unattended-upgrades
+    state: present
+    update_cache: true
+
+- name: Enable fail2ban
+  ansible.builtin.service:
+    name: fail2ban
+    state: started
+    enabled: true
+
+- name: Enable automatic security updates
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+    mode: "0644"
+
+- name: Allow SSH, HTTP and HTTPS through the host firewall
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop: ["22", "80", "443"]
+
+- name: Enable the host firewall, deny inbound by default
+  community.general.ufw:
+    state: enabled
+    policy: deny
+    direction: incoming

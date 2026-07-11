@@ -29,7 +29,7 @@ DEP_VOLUMES = verbatim-intelligence_frontend_node_modules \
               verbatim-intelligence_ai_worker_venv
 
 .PHONY: help up down rebuild logs ps psql lint audit test e2e ci outdated \
-        infra-bootstrap infra-init infra-plan infra-apply infra-output
+        infra-bootstrap infra-init infra-plan infra-apply infra-output configure
 
 help: ## List available targets
 	@grep -E '^[a-z][a-zA-Z_-]*:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -115,6 +115,13 @@ infra-apply: ## Apply the infrastructure changes
 
 infra-output: ## Show Terraform outputs (public IP)
 	@$(TF_ENV) $(TF_RUN) -chdir=/infra output
+
+configure: ## Configure the server with Ansible (hardening, Docker)
+	docker build -q -t verbatim-ansible infra/ansible
+	docker run --rm \
+	  -v "$(CURDIR)/infra/ansible":/ansible \
+	  -v "$(HOME)/.ssh/verbatim_ed25519":/keys/verbatim_ed25519:ro \
+	  verbatim-ansible site.yml
 
 outdated: ## Report outdated dependencies per brick
 	-docker compose run --rm --no-deps frontend npm outdated

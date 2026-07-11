@@ -1,0 +1,7 @@
+# The whole server configuration, declaratively. Rerunnable at will:
+# a second run must report changed=0.
+- name: Configure the verbatim server
+  hosts: verbatim
+  roles:
+    - hardening
+    - docker

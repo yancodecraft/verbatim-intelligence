@@ -1,0 +1,7 @@
+# The instance declared in infra/terraform (output: public_ip).
+all:
+  hosts:
+    verbatim:
+      ansible_host: 51.158.72.142
+      ansible_user: root
+      ansible_ssh_private_key_file: /keys/verbatim_ed25519

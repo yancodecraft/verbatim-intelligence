@@ -6,6 +6,29 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-11 — Revue de la tranche 1 par agent, et ses conclusions traitées
+
+**Fait :** la revue de code par agent (critère de « fini ») a passé toute
+la tranche — trois briques, compose, Makefile, CI, Terraform, Ansible.
+Verdict : aucun bug bloquant, la machine à états, la sécurité réseau et
+les invariants annoncés tiennent. Cinq findings, tous traités :
+- **Le déploiement retombait silencieusement sur `latest` sans `TAG`**
+  (contraire à la pratique « jamais latest ») → le playbook réutilise
+  désormais le tag actuellement déployé (changements d'infra purs), et
+  refuse s'il n'y a ni TAG explicite ni déploiement antérieur. Vérifié en
+  réel.
+- **Fuite d'intervalle sur double-clic** dans `CreateAnalysis.vue` (deux
+  POST concurrents orphelinaient un timer de polling) → garde `creating` +
+  bouton désactivé, test unitaire rouge d'abord.
+- **Backups Postgres absents** alors qu'architecture.md les déclare non
+  négociables → triage assumé : aucune donnée personnelle en base tant que
+  l'ingestion CSV n'existe pas ; la roadmap fait des backups un **prérequis
+  explicite de la tranche 3**. L'écart doc ↔ réalité est désormais écrit.
+- Dependabot ne couvrait ni l'image d'outillage Ansible ni les providers
+  Terraform → ajoutés.
+- Le boilerplate du scaffold Vue (tutoriel, logo) était encore l'écran
+  d'accueil déployé → remplacé par une coquille produit minimale.
+
 ## 2026-07-11 — Premier déploiement : le squelette marche en production
 
 **Fait :** `TAG=<sha> make deploy` a déployé le squelette sur

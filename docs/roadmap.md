@@ -59,6 +59,12 @@ colonne verbatim, insertion des verbatims en base. Rejet propre avec message
 clair (fichier invalide, vide, trop gros) ; le contenu verbatim est traité
 comme non fiable dès cette tranche (échappement à l'affichage).
 
+**Prérequis de cette tranche : les backups Postgres** (automatiques,
+chiffrés, hors machine, restauration testée — la contrainte non négociable
+d'[architecture.md](architecture.md#hébergement)). Dès cette tranche, la
+base contient des données personnelles de tiers : pas d'ingestion réelle
+sans sauvegarde restaurable.
+
 ### 4. Pipeline d'analyse
 
 Le cœur du produit — placé au plus tôt car c'est le plus gros risque :

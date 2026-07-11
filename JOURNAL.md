@@ -6,6 +6,22 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-11 — Premier déploiement : le squelette marche en production
+
+**Fait :** `TAG=<sha> make deploy` a déployé le squelette sur
+`https://verbatim.yantech.fr` — certificat Let's Encrypt émis
+automatiquement par Caddy, basic-auth active (401 sans credentials), six
+conteneurs healthy plus le job de migrations passé avant le backend.
+**Parcours exercé en réel en production** : une analyse créée via l'API
+publique traverse Caddy → backend → Postgres → Redis → worker et atteint
+`succeeded` en ~3 s. Les images tirées de GHCR sont celles que la CI a
+poussées au SHA du commit — publiques d'office, le package hérite de la
+visibilité du repo.
+
+Reste pour clore la tranche 1 : le déclenchement automatique du
+déploiement depuis la CI (un secret SSH côté GitHub), le smoke test
+post-déploiement, et la revue par agent — les critères de « fini ».
+
 ## 2026-07-11 — Images de production et déploiement déclaratif de l'app
 
 **Fait :** les images de prod des trois briques — multi-stage, non-root,

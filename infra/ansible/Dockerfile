@@ -2,13 +2,16 @@
 # only local dependency. Pinned base, pinned ansible-core and collections.
 FROM ghcr.io/astral-sh/uv@sha256:7cf77f594be8042dab6daa9fe326f90962252268b4f120a7f5dccce4d947e6c1
 
+# DL3008: tooling image — openssh-client tracks the pinned base image;
+# pinning the Debian point release breaks every rebuild for no gain here.
+# hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
 RUN uv tool install ansible-core==2.21.1
 ENV PATH="/root/.local/bin:$PATH"
 
-RUN ansible-galaxy collection install community.general:13.1.0
+RUN ansible-galaxy collection install community.general:13.1.0 community.docker:5.2.1
 
 WORKDIR /ansible
 

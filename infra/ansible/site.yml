@@ -1,7 +1,15 @@
 # The whole server configuration, declaratively. Rerunnable at will:
-# a second run must report changed=0.
+# a second run must report changed=0 (converging the stack on the same
+# image tag included).
 - name: Configure the verbatim server
   hosts: verbatim
+  vars_files:
+    # Mounted by `make configure` / `make deploy` from outside the repo.
+    - /secrets/prod.yml
+  vars:
+    app_domain: verbatim.yantech.fr
+    app_tag: "{{ tag | default('latest') }}"
   roles:
     - hardening
     - docker
+    - app

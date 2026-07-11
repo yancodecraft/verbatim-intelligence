@@ -6,6 +6,33 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-11 — Images de production et déploiement déclaratif de l'app
+
+**Fait :** les images de prod des trois briques — multi-stage, non-root,
+bases épinglées : frontend buildé puis servi par un Caddy statique minimal,
+backend publié en Release, worker avec son venv uv recopié sur la base
+Python slim assortie. Quatrième image : **`migrations`**, le bundle EF Core
+auto-porté, exécuté en job one-shot avant le backend
+(`depends_on: service_completed_successfully`) — « les migrations sont une
+étape de déploiement », c'est maintenant mécanique. La CI les pousse sur
+GHCR (tags : SHA du commit — l'unité de déploiement et de rollback — et
+latest). Le rôle Ansible `app` installe compose de prod + Caddyfile (TLS +
+basic-auth) + `.env` de secrets et converge la stack ;
+`TAG=<sha> make deploy` déploie ou rollback.
+
+**Décisions :**
+- **Les secrets de prod vivent dans un fichier local hors repo**
+  (`~/.config/verbatim-intelligence/prod-secrets.yml`, généré aléatoirement),
+  monté en lecture seule dans le conteneur Ansible qui les template en
+  `.env` (0600) sur le serveur. Ni dans le repo, ni dans les commandes.
+- **Exceptions sécurité documentées et scopées** : l'image d'outillage
+  Ansible tourne root (elle doit lire une clé SSH 0600 montée) —
+  `.trivyignore.yaml` porte l'exception au seul fichier concerné, avec
+  justification ; tout nouveau finding ailleurs casse toujours `make audit`.
+- DNS : `verbatim.yantech.fr` → A `51.158.72.142`, posé via l'API Hostinger
+  (les nameservers restent chez Hostinger : la zone porte le mail du
+  domaine, la migrer vers Scaleway l'aurait cassé pour un bénéfice nul).
+
 ## 2026-07-11 — La configuration du serveur devient du code : Ansible
 
 **Fait :** `infra/ansible/` décrit tout l'état du serveur — durcissement

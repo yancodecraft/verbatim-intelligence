@@ -1,0 +1,15 @@
+{{ app_domain }} {
+	# Basic auth at the edge while the app is not public yet
+	# (docs/roadmap.md, slice 1). The hash comes from the environment.
+	basic_auth {
+		{{ basic_auth_user }} {$BASIC_AUTH_HASH}
+	}
+
+	handle_path /api/* {
+		reverse_proxy backend:8080
+	}
+
+	handle {
+		reverse_proxy frontend:8080
+	}
+}

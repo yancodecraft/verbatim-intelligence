@@ -29,7 +29,7 @@ DEP_VOLUMES = verbatim-intelligence_frontend_node_modules \
               verbatim-intelligence_ai_worker_venv
 
 .PHONY: help up down rebuild logs ps psql lint audit test e2e ci outdated \
-        infra-bootstrap infra-init infra-plan infra-apply infra-output configure
+        infra-bootstrap infra-init infra-plan infra-apply infra-output configure deploy
 
 help: ## List available targets
 	@grep -E '^[a-z][a-zA-Z_-]*:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -61,11 +61,15 @@ lint: ## Run all linters (Biome, dotnet build+format, ruff+mypy, hadolint)
 	docker compose run --rm --no-deps ai-worker uv run --frozen ruff check .
 	docker compose run --rm --no-deps ai-worker uv run --frozen ruff format --check .
 	docker compose run --rm --no-deps ai-worker uv run --frozen mypy src tests
-	docker run --rm -v "$(CURDIR)":/repo -w /repo $(HADOLINT_IMAGE) hadolint frontend/Dockerfile.dev backend/Dockerfile.dev ai-worker/Dockerfile.dev
+	docker run --rm -v "$(CURDIR)":/repo -w /repo $(HADOLINT_IMAGE) hadolint \
+	  frontend/Dockerfile.dev frontend/Dockerfile \
+	  backend/Dockerfile.dev backend/Dockerfile \
+	  ai-worker/Dockerfile.dev ai-worker/Dockerfile \
+	  infra/ansible/Dockerfile
 
 audit: ## Security checks (Trivy: misconfigurations + lockfile CVEs)
-	docker run --rm -v "$(CURDIR)":/repo -w /repo $(TRIVY_IMAGE) config --exit-code 1 .
-	docker run --rm -v "$(CURDIR)":/repo -w /repo $(TRIVY_IMAGE) fs --exit-code 1 --scanners vuln,secret .
+	docker run --rm -v "$(CURDIR)":/repo -w /repo $(TRIVY_IMAGE) config --exit-code 1 --ignorefile /repo/.trivyignore.yaml .
+	docker run --rm -v "$(CURDIR)":/repo -w /repo $(TRIVY_IMAGE) fs --exit-code 1 --scanners vuln,secret --ignorefile /repo/.trivyignore.yaml .
 
 # Backend integration tests spawn throwaway Postgres containers via
 # Testcontainers, hence the Docker socket mount (root-only) and the host
@@ -116,12 +120,15 @@ infra-apply: ## Apply the infrastructure changes
 infra-output: ## Show Terraform outputs (public IP)
 	@$(TF_ENV) $(TF_RUN) -chdir=/infra output
 
-configure: ## Configure the server with Ansible (hardening, Docker)
+# TAG selects the image tag to deploy (default latest); rollback is
+# TAG=<previous-sha> make deploy.
+configure deploy: ## Converge the server: hardening, Docker, the app stack
 	docker build -q -t verbatim-ansible infra/ansible
 	docker run --rm \
 	  -v "$(CURDIR)/infra/ansible":/ansible \
 	  -v "$(HOME)/.ssh/verbatim_ed25519":/keys/verbatim_ed25519:ro \
-	  verbatim-ansible site.yml
+	  -v "$(HOME)/.config/verbatim-intelligence/prod-secrets.yml":/secrets/prod.yml:ro \
+	  verbatim-ansible site.yml $(if $(TAG),-e tag=$(TAG),)
 
 outdated: ## Report outdated dependencies per brick
 	-docker compose run --rm --no-deps frontend npm outdated

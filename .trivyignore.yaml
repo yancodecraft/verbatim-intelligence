@@ -1,0 +1,17 @@
+# Documented, path-scoped exceptions only — a new finding anywhere else
+# still fails `make audit`.
+misconfigurations:
+  - id: DS-0002 # non-root USER
+    paths:
+      - infra/ansible/Dockerfile
+    statement: >-
+      Ephemeral local tooling container (make configure/deploy): it must read
+      an SSH private key bind-mounted with 0600 owner-only permissions, which
+      a non-root container user cannot do on Linux hosts. Never deployed,
+      never exposed.
+  - id: DS-0026 # HEALTHCHECK
+    paths:
+      - infra/ansible/Dockerfile
+    statement: >-
+      One-shot ansible-playbook run, not a service: its exit code is the
+      health signal.

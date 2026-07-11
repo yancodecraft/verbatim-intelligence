@@ -1,0 +1,33 @@
+# The application: compose file, edge Caddy config, secrets — then pull
+# and converge the stack. Rerunning with the same TAG is a no-op.
+- name: Create the application directory
+  ansible.builtin.file:
+    path: /opt/verbatim
+    state: directory
+    mode: "0755"
+
+- name: Install the compose file
+  ansible.builtin.copy:
+    src: compose.yaml
+    dest: /opt/verbatim/compose.yaml
+    mode: "0644"
+
+- name: Install the Caddyfile
+  ansible.builtin.template:
+    src: Caddyfile.j2
+    dest: /opt/verbatim/Caddyfile
+    mode: "0644"
+
+- name: Install the environment file (secrets)
+  ansible.builtin.template:
+    src: env.j2
+    dest: /opt/verbatim/.env
+    mode: "0600"
+
+- name: Pull and converge the stack
+  community.docker.docker_compose_v2:
+    project_src: /opt/verbatim
+    pull: always
+    state: present
+    wait: true
+    wait_timeout: 180

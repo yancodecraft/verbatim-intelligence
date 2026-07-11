@@ -1,0 +1,23 @@
+# Production image: the synced virtualenv is built with uv, then copied
+# onto the matching slim Python base (the uv python3.14 variants are built
+# from the same docker-library python image, so the venv symlinks resolve).
+FROM ghcr.io/astral-sh/uv@sha256:7cf77f594be8042dab6daa9fe326f90962252268b4f120a7f5dccce4d947e6c1 AS build
+
+WORKDIR /app
+ENV UV_LINK_MODE=copy UV_COMPILE_BYTECODE=1
+COPY pyproject.toml uv.lock README.md ./
+RUN uv sync --frozen --no-dev --no-install-project
+COPY src src
+RUN uv sync --frozen --no-dev
+
+FROM python:3.14-slim-bookworm@sha256:4ff4b92a68355dbdb52584ab3391dff8d371a61d4e063468bfd0130e3189c6d9
+
+RUN groupadd --system app && useradd --system --gid app app
+COPY --from=build --chown=app:app /app /app
+USER app
+ENV PATH="/app/.venv/bin:$PATH"
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s \
+  CMD ["python", "-c", "import os, sys; from ai_worker.database import is_database_ready; sys.exit(0 if is_database_ready(os.environ['DATABASE_URL']) else 1)"]
+
+CMD ["ai-worker"]

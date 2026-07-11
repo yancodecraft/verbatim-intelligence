@@ -35,3 +35,28 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - run: make up
       - run: make e2e
+
+  # Production images, pushed to GHCR on main only. Tags: the commit SHA
+  # (deploy and rollback unit) and latest.
+  build-push:
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Build and push the four images
+        run: |
+          set -eu
+          REGISTRY=ghcr.io/${{ github.repository }}
+          docker build -t "$REGISTRY/frontend:${{ github.sha }}" -t "$REGISTRY/frontend:latest" frontend
+          docker build --target api -t "$REGISTRY/backend:${{ github.sha }}" -t "$REGISTRY/backend:latest" backend
+          docker build --target migrations -t "$REGISTRY/migrations:${{ github.sha }}" -t "$REGISTRY/migrations:latest" backend
+          docker build -t "$REGISTRY/ai-worker:${{ github.sha }}" -t "$REGISTRY/ai-worker:latest" ai-worker
+          for image in frontend backend migrations ai-worker; do
+            docker push --all-tags "$REGISTRY/$image"
+          done

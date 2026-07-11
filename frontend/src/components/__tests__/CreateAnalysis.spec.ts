@@ -63,6 +63,28 @@ describe("CreateAnalysis", () => {
 		expect(fetchMock).toHaveBeenCalledTimes(3);
 	});
 
+	it("ignores clicks while a creation is already in flight", async () => {
+		let resolveFirst: (value: Response) => void = () => {};
+		const fetchMock = vi
+			.fn()
+			.mockImplementationOnce(
+				() =>
+					new Promise<Response>((resolve) => {
+						resolveFirst = resolve;
+					}),
+			)
+			.mockResolvedValue(jsonResponse("succeeded"));
+		vi.stubGlobal("fetch", fetchMock);
+		const wrapper = mount(CreateAnalysis);
+
+		await wrapper.get("button").trigger("click");
+		await wrapper.get("button").trigger("click");
+		resolveFirst(jsonResponse("pending"));
+		await flushPromises();
+
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+	});
+
 	it("shows an error when the creation fails", async () => {
 		vi.stubGlobal(
 			"fetch",

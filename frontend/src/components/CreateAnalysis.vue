@@ -13,9 +13,16 @@ const POLL_INTERVAL_MS = 1000;
 
 const analysis = ref<Analysis | null>(null);
 const failed = ref(false);
+const creating = ref(false);
 let pollTimer: ReturnType<typeof setInterval> | undefined;
 
 async function createAnalysis(): Promise<void> {
+	// A single shared poll timer: concurrent creations would orphan the
+	// previous interval, so clicks are ignored while one is in flight.
+	if (creating.value) {
+		return;
+	}
+	creating.value = true;
 	stopPolling();
 	failed.value = false;
 	analysis.value = null;
@@ -28,6 +35,8 @@ async function createAnalysis(): Promise<void> {
 		pollTimer = setInterval(refresh, POLL_INTERVAL_MS);
 	} catch {
 		failed.value = true;
+	} finally {
+		creating.value = false;
 	}
 }
 
@@ -65,7 +74,9 @@ onUnmounted(stopPolling);
 
 <template>
 	<section class="create-analysis">
-		<button type="button" @click="createAnalysis">Create analysis</button>
+		<button type="button" :disabled="creating" @click="createAnalysis">
+			Create analysis
+		</button>
 		<p v-if="failed">Something went wrong</p>
 		<p v-else-if="analysis" :data-status="analysis.status">
 			Analysis {{ analysis.id }} is {{ analysis.status }}

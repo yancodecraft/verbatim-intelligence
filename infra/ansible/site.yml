@@ -8,7 +8,6 @@
     - /secrets/prod.yml
   vars:
     app_domain: verbatim.yantech.fr
-    app_tag: "{{ tag | default('latest') }}"
   roles:
     - hardening
     - docker

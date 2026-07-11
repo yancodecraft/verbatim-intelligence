@@ -1,5 +1,28 @@
 # The application: compose file, edge Caddy config, secrets — then pull
 # and converge the stack. Rerunning with the same TAG is a no-op.
+#
+# The image tag is never defaulted to a mutable one: an explicit TAG wins,
+# otherwise the currently deployed tag is reused (infra-only changes),
+# otherwise the deploy refuses.
+- name: Read the current deployment
+  ansible.builtin.slurp:
+    src: /opt/verbatim/.env
+  register: current_env
+  failed_when: false
+
+- name: Resolve the image tag to deploy
+  ansible.builtin.set_fact:
+    app_tag: >-
+      {{ tag
+         if tag is defined
+         else ((current_env.content | b64decode | regex_search('TAG=(.+)', '\1') | first)
+               if current_env.content is defined else '') }}
+
+- name: Refuse to deploy without a resolvable tag
+  ansible.builtin.fail:
+    msg: "No TAG given and no previous deployment to reuse — run: TAG=<commit-sha> make deploy"
+  when: app_tag | trim == ''
+
 - name: Create the application directory
   ansible.builtin.file:
     path: /opt/verbatim

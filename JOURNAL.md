@@ -18,9 +18,15 @@ publique traverse Caddy → backend → Postgres → Redis → worker et atteint
 poussées au SHA du commit — publiques d'office, le package hérite de la
 visibilité du repo.
 
+**Smoke test intégré au déploiement** : après la convergence, le playbook
+vérifie depuis le contrôleur, à travers l'edge public, que les requêtes
+sans credentials prennent un 401 (la protection fait partie du contrat) et
+que `/api/health` répond `Healthy` derrière l'auth — un déploiement qui ne
+sert pas de trafic réel n'a pas eu lieu.
+
 Reste pour clore la tranche 1 : le déclenchement automatique du
-déploiement depuis la CI (un secret SSH côté GitHub), le smoke test
-post-déploiement, et la revue par agent — les critères de « fini ».
+déploiement depuis la CI (un secret SSH côté GitHub) et la revue par
+agent — les critères de « fini ».
 
 ## 2026-07-11 — Images de production et déploiement déclaratif de l'app
 

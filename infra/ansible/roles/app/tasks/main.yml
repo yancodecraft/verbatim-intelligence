@@ -31,3 +31,28 @@
     state: present
     wait: true
     wait_timeout: 180
+
+# Post-deploy smoke tests, from the controller through the public edge:
+# a deploy that does not serve real traffic has not happened.
+- name: Smoke test — unauthenticated requests are rejected
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "https://{{ app_domain }}/"
+    status_code: 401
+  retries: 6
+  delay: 10
+  register: unauthenticated_check
+  until: unauthenticated_check.status == 401
+
+- name: Smoke test — the API answers healthy behind auth
+  delegate_to: localhost
+  ansible.builtin.uri:
+    url: "https://{{ app_domain }}/api/health"
+    user: "{{ basic_auth_user }}"
+    password: "{{ basic_auth_password }}"
+    force_basic_auth: true
+    return_content: true
+  register: health_check
+  retries: 6
+  delay: 10
+  until: health_check.status == 200 and 'Healthy' in health_check.content

@@ -6,6 +6,34 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-11 — L'infrastructure devient du code : Terraform sur Scaleway
+
+**Fait :** `infra/terraform/` décrit toute l'infrastructure de prod —
+instance DEV1-M Ubuntu 24.04 (3 vCPU / 4 Go, ~15 €/mois, largement assez
+pour le squelette), IP flexible, security group fermé sauf 22/80/443, clé
+SSH dédiée. Appliqué et vérifié en réel : SSH répond sur l'IP publique.
+Terraform tourne en conteneur (`make infra-plan|apply`), image épinglée —
+Docker reste la seule dépendance.
+
+**Décisions :**
+- **Déploiement 100 % déclaratif** : Terraform pour l'infrastructure,
+  Ansible (étape suivante) pour la configuration de la machine. Aucune
+  commande manuelle sur le serveur ne fait foi — tout est relisible,
+  rejouable, versionné.
+- **State distant** dans un bucket Object Storage Scaleway (backend
+  S3-compatible), créé par une mini-config de bootstrap au state local
+  gitignoré (œuf-et-poule assumé, perte tolérable : un `terraform import`
+  le recrée). Un state local pour l'infra elle-même aurait été un piège
+  sur un repo public.
+- **Credentials jamais dans le repo** : les cibles make lisent la config
+  du CLI `scw` au moment de l'invocation et les passent en variables
+  d'environnement au conteneur. Le `.terraform.lock.hcl` est versionné
+  (il épingle les hashes des providers — même logique que les digests).
+- **Registry : GHCR** — gratuit pour un repo public, authentification
+  native `GITHUB_TOKEN` dans les workflows, aucun secret supplémentaire.
+- Terraform (BUSL, usage interne libre) plutôt qu'OpenTofu, choix
+  utilisateur explicite.
+
 ## 2026-07-10 — La CI attrape ce que macOS masquait : l'UID du bind mount
 
 **Fait :** premier run GitHub Actions : `test` et `audit` verts du premier

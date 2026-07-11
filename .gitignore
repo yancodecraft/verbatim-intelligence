@@ -1,0 +1,6 @@
+# Terraform — state and provider caches never enter the repo
+# (.terraform.lock.hcl IS committed: it pins provider hashes).
+infra/terraform/**/.terraform/
+infra/terraform/**/terraform.tfstate
+infra/terraform/**/terraform.tfstate.*
+infra/terraform/**/*.tfvars

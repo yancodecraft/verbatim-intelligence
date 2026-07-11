@@ -128,7 +128,15 @@ Chaque brique porte ses propres tests ; rien n'est « fini » sans eux.
 
 ## Hébergement
 
-Un VPS unique : Docker Compose en production, Caddy en frontal (TLS).
+Un VPS unique chez **Scaleway** (`verbatim.yantech.fr`) : Docker Compose en
+production, Caddy en frontal (TLS). **Tout est déclaratif, dans `infra/`** :
+Terraform décrit l'infrastructure (instance, IP, security group, clé SSH —
+state distant dans un bucket Object Storage), Ansible décrit la
+configuration de la machine (durcissement, Docker, l'application). Les deux
+s'exécutent en conteneurs via le Makefile ; aucune modification manuelle
+sur le serveur. Les images de production sont publiées sur GHCR (gratuit
+pour un repo public, authentification native des workflows).
+
 Contraintes non négociables : Postgres et Redis ne sont **jamais** publiés
 sur l'hôte (réseau Docker interne uniquement, Redis avec mot de passe) ;
 secrets en variables d'environnement hors repo ; backups Postgres
@@ -138,5 +146,4 @@ automatiques, chiffrés, hors de la machine, avec restauration testée.
 
 - Les choix fins par brique (librairies Python, framework de tests front) —
   décidés au moment où la brique démarre.
-- Le fournisseur du VPS et l'envoi d'e-mails (magic links) — décidés au
-  moment du premier déploiement.
+- L'envoi d'e-mails (magic links) — décidé au moment de la tranche auth.

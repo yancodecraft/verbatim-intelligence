@@ -7,6 +7,20 @@ HADOLINT_IMAGE = hadolint/hadolint@sha256:27086352fd5e1907ea2b934eb1023f217c5ae0
 TRIVY_IMAGE = aquasec/trivy@sha256:cffe3f5161a47a6823fbd23d985795b3ed72a4c806da4c4df16266c02accdd6f
 # Keep in sync with @playwright/test in frontend/package.json.
 PLAYWRIGHT_IMAGE = mcr.microsoft.com/playwright@sha256:5b8f294aff9041b7191c34a4bab3ac270157a28774d4b0660e9743297b697e48
+TERRAFORM_IMAGE = hashicorp/terraform@sha256:7ae513256f7ce67879e218ae8593d6fbe216ec9e123abe6c94e4e10704857963
+
+# Terraform runs in a container; Scaleway credentials are read from the scw
+# CLI config at invocation time and the state backend is S3-compatible
+# Object Storage. Nothing sensitive ever enters the repo.
+SCW_CONFIG = $(HOME)/.config/scw/config.yaml
+TF_ENV = AWS_ACCESS_KEY_ID=$$(awk '$$1=="access_key:"{print $$2}' "$(SCW_CONFIG)") \
+         AWS_SECRET_ACCESS_KEY=$$(awk '$$1=="secret_key:"{print $$2}' "$(SCW_CONFIG)") \
+         TF_VAR_ssh_public_key="$$(cat "$(HOME)/.ssh/verbatim_ed25519.pub")"
+TF_RUN = docker run --rm \
+         -v "$(CURDIR)/infra/terraform":/infra \
+         -v "$(SCW_CONFIG)":/root/.config/scw/config.yaml:ro \
+         -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e TF_VAR_ssh_public_key \
+         $(TERRAFORM_IMAGE)
 
 # Named volumes holding in-container dependencies. They are seeded from the
 # image only on first creation, so they must be dropped on rebuild.
@@ -14,7 +28,8 @@ DEP_VOLUMES = verbatim-intelligence_frontend_node_modules \
               verbatim-intelligence_backend_nuget \
               verbatim-intelligence_ai_worker_venv
 
-.PHONY: help up down rebuild logs ps psql lint audit test e2e ci outdated
+.PHONY: help up down rebuild logs ps psql lint audit test e2e ci outdated \
+        infra-bootstrap infra-init infra-plan infra-apply infra-output
 
 help: ## List available targets
 	@grep -E '^[a-z][a-zA-Z_-]*:.*## ' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -84,6 +99,22 @@ ci: ## Run the full pipeline: lint, tests, build, e2e, audit
 	$(MAKE) up
 	$(MAKE) e2e
 	$(MAKE) audit
+
+infra-bootstrap: ## One-time: create the Terraform state bucket
+	@$(TF_ENV) $(TF_RUN) -chdir=/infra/bootstrap init -input=false
+	@$(TF_ENV) $(TF_RUN) -chdir=/infra/bootstrap apply -input=false -auto-approve
+
+infra-init: ## Initialize Terraform (providers, remote state)
+	@$(TF_ENV) $(TF_RUN) -chdir=/infra init -input=false
+
+infra-plan: ## Show the infrastructure changes Terraform would make
+	@$(TF_ENV) $(TF_RUN) -chdir=/infra plan -input=false
+
+infra-apply: ## Apply the infrastructure changes
+	@$(TF_ENV) $(TF_RUN) -chdir=/infra apply -input=false -auto-approve
+
+infra-output: ## Show Terraform outputs (public IP)
+	@$(TF_ENV) $(TF_RUN) -chdir=/infra output
 
 outdated: ## Report outdated dependencies per brick
 	-docker compose run --rm --no-deps frontend npm outdated

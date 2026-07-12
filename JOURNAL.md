@@ -6,6 +6,20 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-12 — Le déploiement continu boucle la tranche 1
+
+**Fait :** le job `deploy` clôt la chaîne : sur `main`, après lint + tests +
+e2e + audit + publication des images, la CI rejoue exactement `make deploy`
+avec le SHA du commit — le même geste qu'en local, aucune logique propre au
+runner. `concurrency: production` interdit deux déploiements simultanés.
+Les credentials (clé SSH de déploiement, secrets de prod) vivent en secrets
+GitHub, reconstitués sur le runner à l'exécution.
+
+Avec la revue par agent traitée, le parcours exercé en production et la CI
+verte, **les quatre critères de « fini » sont remplis : la tranche 1 est
+close.** Prochaine étape selon la roadmap : la tranche 2 (auth par magic
+link), avec le spike pipeline à mener en parallèle sur un corpus réel.
+
 ## 2026-07-11 — Revue de la tranche 1 par agent, et ses conclusions traitées
 
 **Fait :** la revue de code par agent (critère de « fini ») a passé toute

@@ -6,6 +6,61 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-12 — Le spike pipeline a tranché : découverte par batchs + consolidation
+
+**Le dispositif** (`spike/`, script jetable hors des briques, conforme à la
+roadmap) : deux stratégies de regroupement comparées à modèle constant
+(claude-opus-4-8, structured outputs), sur le golden corpus synthétique
+(101 verbatims, 6 thèmes plantés + bruit) puis sur le corpus réel State of
+CSS 2021 (748 réponses libres, question « browser incompatibilities »).
+
+- **`direct`** — découverte des thèmes par batchs de 100, puis une passe de
+  consolidation qui fusionne les doublons inter-batchs.
+- **`taxonomy`** — taxonomie émergente proposée sur un échantillon, puis
+  classification de tout le corpus contre elle.
+
+**Verdict : `direct` gagne sur tous les axes, c'est elle qu'on
+industrialise en tranche 4.**
+
+| run | résultat | coût | durée |
+|---|---|---|---|
+| direct / golden | 6/6 thèmes plantés, 100 % de couverture | $0.13 | 54 s |
+| taxonomy / golden | 6/6 thèmes, 92-100 % | $0.20 | 122 s |
+| direct / réel (748) | 12 thèmes justes (subgrid, « Safari nouveau IE », gap flexbox, fardeau IE11…), couverture complète | $0.48 | 2 min 45 |
+| taxonomy / réel | **jamais complète en 4 tentatives** : 342 à 467 verbatims non classifiés | $0.6-1.1 | 10-25 min |
+
+La stratégie `taxonomy` échoue sur un mode de défaillance structurel de la
+classification pure : sur un batch entier, le modèle renvoie parfois **la
+plus petite sortie qui satisfait le schéma** (un thème, liste d'ids vide) —
+en alternance binaire avec des batchs parfaits (80/80). Réduire les chunks,
+interdire les listes vides au prompt, ajouter une passe de rattrapage :
+rien n'y a fait. La découverte par batchs, elle, n'a jamais failli en sept
+runs : le modèle assigne bien quand il découvre, il démissionne quand il
+classifie en masse.
+
+**La fidélité par référence tient** : sur tous les runs, zéro violation —
+le LLM ne retourne que des ids, chaque citation est résolue depuis le
+corpus, et les textes cités sont vérifiés mot pour mot contre la source
+(jusqu'aux espaces finales).
+
+**Enseignements pour la tranche 4 :**
+1. **La langue de sortie est une décision système**, injectée dans le
+   prompt — laissée au LLM (« langue dominante du corpus »), elle a produit
+   du français sur un corpus 95 % anglais.
+2. **Les structured outputs garantissent la forme, jamais l'exhaustivité ni
+   la lettre** : listes silencieusement sous-remplies, variantes de casse
+   malgré l'enum, `minItems > 1` rejeté par l'API. Chaque étape du pipeline
+   doit vérifier programmatiquement ce qu'elle reçoit (ids valides,
+   couverture, noms connus) et prévoir un rattrapage — la V1 comptera et
+   exposera ce qui n'a pas pu être traité plutôt que de le taire.
+3. **Ordres de grandeur** (opus-4-8, sans parallélisation) : ~$0.50 et
+   ~3 min pour 748 verbatims — extrapolé ~$3-4 et 15-20 min pour les 5 000
+   de la V1. Le plafond de coût par analyse (déjà dans la spec) est
+   confortable ; la latence plaide pour paralléliser les batchs de
+   découverte dans le worker.
+4. La consolidation inter-batchs produit des thèmes propres et sans
+   doublons ; c'est l'appel le plus « intelligent » du pipeline, à soigner.
+
 ## 2026-07-12 — Trouver un corpus réel pour le spike pipeline
 
 **Le problème :** le spike pipeline (voir la roadmap) se juge sur des

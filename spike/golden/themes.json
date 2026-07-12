@@ -1,0 +1,26 @@
+{
+  "pricing": {
+    "label": "Pricing confusion and billing surprises",
+    "keywords": ["pricing", "price", "billing", "cost", "expensive", "tier"]
+  },
+  "performance": {
+    "label": "Slow dashboards and query performance",
+    "keywords": ["slow", "performance", "load", "speed", "lag", "timeout"]
+  },
+  "csv_export": {
+    "label": "Broken or limited CSV exports",
+    "keywords": ["export", "csv"]
+  },
+  "support": {
+    "label": "Outstanding customer support",
+    "keywords": ["support", "customer service", "help team"]
+  },
+  "mobile": {
+    "label": "Missing mobile app / poor mobile experience",
+    "keywords": ["mobile", "phone", "app", "ios", "android"]
+  },
+  "onboarding": {
+    "label": "Onboarding and login friction",
+    "keywords": ["onboarding", "login", "log in", "signup", "sign up", "magic link", "setup", "first-run", "email verification", "session"]
+  }
+}

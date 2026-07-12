@@ -2,6 +2,9 @@
 # they live here locally, for the pipeline spike and manual testing.
 corpus/
 
+# Spike runs on real corpora quote real verbatims — reports stay local.
+spike/results/
+
 # Terraform — state and provider caches never enter the repo
 # (.terraform.lock.hcl IS committed: it pins provider hashes).
 infra/terraform/**/.terraform/

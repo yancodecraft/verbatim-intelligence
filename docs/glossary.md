@@ -54,7 +54,8 @@ Les termes récurrents des documents du projet, dans leur sens précis ici.
   cycles courts rouge → vert → refactor. Appliqué strictement sur `backend/`
   et `ai-worker/`.
 - **Spike** — une exploration jetable et bornée pour lever un risque avant
-  d'industrialiser (ici : le spike pipeline de la tranche 0). Son code ne
+  d'industrialiser (ici : le spike pipeline, mené en parallèle de la
+  tranche 1). Son code ne
   rejoint pas les briques ; sa conclusion rejoint le journal.
 - **Golden corpus** — un corpus de référence anonymisé, aux attentes écrites,
   qui sert à évaluer la qualité du pipeline et à détecter les régressions de

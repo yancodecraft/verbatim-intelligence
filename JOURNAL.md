@@ -6,6 +6,51 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-12 — Trouver un corpus réel pour le spike pipeline
+
+**Le problème :** le spike pipeline (voir la roadmap) se juge sur des
+verbatims réels — du texte libre humain avec son bruit : fautes,
+hors-sujet, doublons, longueurs imprévisibles. Or on n'a aucune donnée
+client. Un corpus généré par LLM aurait le bon sujet mais pas le bon
+bruit ; il ne répondrait pas à la question que le spike doit trancher.
+
+**Pistes examinées :**
+- **Sondages développeurs publics** — le meilleur alignement avec un cas
+  d'usage type du produit. Stack Overflow Developer Survey publie ses
+  données brutes mais quasi exclusivement du fermé (QCM). State of
+  JS/CSS : les réponses individuelles complètes ne sont pas en
+  libre-service (agrégats via API GraphQL ; le JSON complet se demande
+  sur leur Discord).
+- **Avis clients** (Kaggle, Hugging Face) : gros volumes très réels —
+  US Airline Tweets, avis d'apps ; et pour le **français**, Allociné ou
+  amazon_reviews_multi.
+- **Consultations publiques françaises** : le Grand Débat National
+  (data.gouv.fr, licence ouverte) — des centaines de milliers de
+  contributions libres en français.
+- **Génération synthétique** : écartée comme corpus principal, mais
+  retenue pour le **golden corpus** — ~100-200 verbatims aux thèmes
+  plantés et au bruit injecté volontairement, seule façon de connaître
+  la vérité terrain et de juger objectivement le pipeline (thèmes
+  retrouvés ? bons ids cités ?).
+
+**Trouvé et vérifié :** un extrait officiel en libre accès — le Gist de
+Sacha Greif (créateur des sondages) avec les réponses libres de State of
+CSS 2021 : **1 099 verbatims réels** sur quatre questions ouvertes, dont
+« browser incompatibilities » (748 réponses). Format trivial (JSON, liste
+de chaînes → CSV à une colonne verbatim, exactement le contrat
+d'ingestion V1), bruit authentique (de « gap » à des paragraphes
+techniques). Pas de licence explicite sur le Gist, mais les sondages
+annoncent publiquement des données « released openly » — et le corpus
+reste de toute façon **hors repo** (règle : jamais de corpus de
+verbatims dans le repo), utilisé localement pour le spike.
+
+**Décision :** partir sur la question « browser incompatibilities »
+(748 verbatims) comme corpus principal du spike — réel, bruité, proche
+d'un cas d'usage cible (sondage développeurs, une question ouverte) —
+complété d'un golden corpus synthétique avec attentes écrites. Un corpus
+français (Allociné ou Grand Débat) viendra en second temps vérifier que
+le pipeline tient dans les deux langues.
+
 ## 2026-07-12 — Le déploiement continu boucle la tranche 1
 
 **Fait :** le job `deploy` clôt la chaîne : sur `main`, après lint + tests +

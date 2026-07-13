@@ -9,7 +9,8 @@ namespace VerbatimIntelligence.Api.Tests;
 /// </summary>
 public class AnalysesEndpointsTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
-    private sealed record AnalysisResponse(Guid Id, string Status, DateTimeOffset CreatedAt);
+    private sealed record AnalysisResponse(
+        Guid Id, string Status, DateTimeOffset CreatedAt, string SourceFilename, int VerbatimCount);
 
     private async Task<HttpClient> SignedInClientAsync()
     {
@@ -105,5 +106,47 @@ public class AnalysesEndpointsTests(ApiFactory factory) : IClassFixture<ApiFacto
         var response = await client.GetAsync($"/analyses/{Guid.NewGuid()}");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ListAnalyses_WithoutASession_Returns401()
+    {
+        var response = await factory.CreateClient().GetAsync("/analyses");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ListAnalyses_ReturnsTheAccountsAnalysesNewestFirst()
+    {
+        var client = await SignedInClientAsync();
+        var first = await (await client.PostAsync("/analyses", content: null))
+            .Content.ReadFromJsonAsync<AnalysisResponse>();
+        var second = await (await client.PostAsync("/analyses", content: null))
+            .Content.ReadFromJsonAsync<AnalysisResponse>();
+        Assert.NotNull(first);
+        Assert.NotNull(second);
+
+        var list = await client.GetFromJsonAsync<List<AnalysisResponse>>("/analyses");
+
+        Assert.NotNull(list);
+        Assert.Equal(second.Id, list[0].Id);
+        Assert.Equal(first.Id, list[1].Id);
+        Assert.Equal("pending", list[0].Status);
+    }
+
+    [Fact]
+    public async Task ListAnalyses_DoesNotListAnotherAccountsAnalyses()
+    {
+        var owner = await SignedInClientAsync();
+        var mine = await (await owner.PostAsync("/analyses", content: null))
+            .Content.ReadFromJsonAsync<AnalysisResponse>();
+        Assert.NotNull(mine);
+
+        var intruder = await SignedInClientAsync();
+        var list = await intruder.GetFromJsonAsync<List<AnalysisResponse>>("/analyses");
+
+        Assert.NotNull(list);
+        Assert.DoesNotContain(list, analysis => analysis.Id == mine.Id);
     }
 }

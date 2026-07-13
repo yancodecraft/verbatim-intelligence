@@ -37,6 +37,17 @@ public static class AnalysesEndpoints
             return Results.Created($"/analyses/{analysis.Id}", AnalysisResponse.From(analysis));
         });
 
+        // The account's analyses, newest first. The global query filter
+        // (AppDbContext) scopes the set to the caller — another account's
+        // analyses are simply not there.
+        group.MapGet("/", async (AppDbContext db, CancellationToken cancellationToken) =>
+        {
+            var analyses = await db.Analyses
+                .OrderByDescending(analysis => analysis.CreatedAt)
+                .ToListAsync(cancellationToken);
+            return Results.Ok(analyses.Select(AnalysisResponse.From));
+        });
+
         // Another account's analysis is a plain 404, indistinguishable from
         // a non-existent id: the global query filter (AppDbContext) hides it
         // before this query even looks.
@@ -51,8 +62,13 @@ public static class AnalysesEndpoints
     }
 }
 
-public sealed record AnalysisResponse(Guid Id, AnalysisStatus Status, DateTimeOffset CreatedAt)
+public sealed record AnalysisResponse(
+    Guid Id,
+    AnalysisStatus Status,
+    DateTimeOffset CreatedAt,
+    string SourceFilename,
+    int VerbatimCount)
 {
     public static AnalysisResponse From(Analysis analysis) =>
-        new(analysis.Id, analysis.Status, analysis.CreatedAt);
+        new(analysis.Id, analysis.Status, analysis.CreatedAt, analysis.SourceFilename, analysis.VerbatimCount);
 }

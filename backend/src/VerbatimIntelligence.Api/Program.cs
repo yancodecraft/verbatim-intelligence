@@ -8,8 +8,13 @@ using VerbatimIntelligence.Api.Analyses;
 using VerbatimIntelligence.Api.Auth;
 using VerbatimIntelligence.Api.Data;
 using VerbatimIntelligence.Api.Email;
+using VerbatimIntelligence.Api.Uploads;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Room for a 5 MB upload (the CSV contract) plus multipart overhead; the
+// endpoint enforces the 5 MB rule itself with a clear message.
+builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 6 * 1024 * 1024);
 
 builder.Services.AddOpenApi();
 builder.Services.AddSingleton(TimeProvider.System);
@@ -53,6 +58,7 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 // ever serves plain HTTP inside the compose network.
 app.MapHealthChecks("/health");
 app.MapAuth();
+app.MapUploads();
 app.MapAnalyses();
 
 await app.RunAsync();

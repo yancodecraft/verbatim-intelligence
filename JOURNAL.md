@@ -6,6 +6,41 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-13 — L'auth de bout en bout : magic link, sessions, scoping mécanique
+
+**Fait, en TDD brique par brique :**
+- **Modèle** : `users` (compte = e-mail, créé à la première connexion),
+  `login_tokens` et `sessions` — les tokens ne sont **jamais stockés en
+  clair** (SHA-256 seulement), un lien est à usage unique et expire en
+  15 minutes, une session est un cookie httpOnly opaque adossé à une ligne
+  révocable en base (30 jours).
+- **Endpoints** : `POST /auth/magic-link` (répond 202 que le compte existe
+  ou non — pas d'énumération d'e-mails), `POST /auth/verify` (le lien
+  pointe vers une page front qui POSTe le token : un GET consommable serait
+  grillé par les préchargeurs d'e-mail), `GET /auth/me`, `POST /auth/logout`.
+- **Scoping mécanique** (le point structurant de la tranche) : un filtre
+  unique `RequireAccount()` sur tout groupe d'endpoints scopé — un handler
+  ne peut pas oublier de vérifier ; `user_id` NOT NULL sur `analyses` ;
+  l'analyse d'un autre compte répond **404**, indistinguable d'un id
+  inexistant. Un test d'autorisation par endpoint. Le DDL miroir des tests
+  du worker suit le nouveau schéma.
+- **Front** : /sign-in, /verify, garde de route, en-tête de session, sign
+  out. Le e2e refait le parcours réel complet : visiteur anonyme muré →
+  demande de lien → **lecture du vrai mail via l'API Mailpit** → connexion
+  → analyse jusqu'à `succeeded` → sign out.
+
+**Le piège attrapé par le e2e** : les routes auth étaient mappées
+`/api/auth/*` côté backend, alors que les deux proxys (Vite en dev, Caddy
+en prod) **strippent** `/api` avant de forwarder — le contrat, établi par
+`/analyses` en tranche 1, est « routes nues côté backend ». Les tests
+d'intégration, qui parlent au backend en direct, ne pouvaient pas le voir ;
+le parcours à travers la vraie pile l'a cassé immédiatement. C'est
+exactement le rôle du squelette marchant.
+
+Les analyses pré-auth (celles des smoke runs du squelette) sont supprimées
+par la migration : elles n'ont pas de propriétaire possible et aucune
+valeur.
+
 ## 2026-07-13 — Tranche 2 ouverte : l'e-mail d'abord, en vrai dès le premier test
 
 **Décision :** les magic links partiront par **SMTP** (MailKit) derrière une

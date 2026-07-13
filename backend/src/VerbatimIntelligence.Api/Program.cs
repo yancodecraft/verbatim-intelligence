@@ -6,6 +6,7 @@ using StackExchange.Redis;
 
 using VerbatimIntelligence.Api.Analyses;
 using VerbatimIntelligence.Api.Data;
+using VerbatimIntelligence.Api.Email;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,6 +22,12 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
 builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(
         new JsonStringEnumConverter(System.Text.Json.JsonNamingPolicy.CamelCase)));
+// ValidateOnStart materializes the options at boot: missing Email settings
+// fail fast (required members), not on the first e-mail sent.
+builder.Services.AddOptions<EmailOptions>()
+    .BindConfiguration(EmailOptions.SectionName)
+    .ValidateOnStart();
+builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
 builder.Services.AddHealthChecks().AddDbContextCheck<AppDbContext>();
 
 var app = builder.Build();

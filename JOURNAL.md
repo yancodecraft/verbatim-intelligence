@@ -6,6 +6,26 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-13 — Tranche 2 ouverte : l'e-mail d'abord, en vrai dès le premier test
+
+**Décision :** les magic links partiront par **SMTP** (MailKit) derrière une
+abstraction minimale — le protocole comme contrat, pas un SDK de
+fournisseur. En prod : **Scaleway TEM** (mono-fournisseur avec
+l'hébergement, déclarable dans le Terraform existant, DNS posable par
+l'outillage déjà en place). En dev, en tests et en e2e : **Mailpit** dans le
+compose, dont l'API REST permet de vérifier la réception réelle — le test
+d'intégration du sender envoie un vrai mail SMTP et le relit via cette API,
+aucun mock. Alternatives écartées : Resend et Postmark (très bons, mais un
+fournisseur et un compte de plus pour un besoin que TEM couvre).
+
+**Fait :** Mailpit épinglé par digest dans le compose (UI sur :8125),
+`IEmailSender`/`SmtpEmailSender` dans le backend (TDD, rouge d'abord),
+Mailpit ajouté à l'ApiFactory des tests. Stack dev vérifiée en réel :
+mailpit healthy, backend Healthy avec sa nouvelle config. Pièges du jour :
+`ContainerBuilder()` sans image est obsolète (même piège que
+PostgreSqlBuilder en tranche 1), et `TestContext.Current` est du xUnit v3 —
+le projet est en v2.
+
 ## 2026-07-12 — Le spike pipeline a tranché : découverte par batchs + consolidation
 
 **Le dispositif** (`spike/`, script jetable hors des briques, conforme à la

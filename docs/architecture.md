@@ -156,8 +156,20 @@ sur l'hôte (réseau Docker interne uniquement, Redis avec mot de passe) ;
 secrets en variables d'environnement hors repo ; backups Postgres
 automatiques, chiffrés, hors de la machine, avec restauration testée.
 
+## E-mails transactionnels (magic links)
+
+Le backend parle **SMTP** (MailKit) derrière une abstraction minimale
+(`IEmailSender`) : le protocole est le contrat, pas un SDK de fournisseur.
+
+- **Dev, tests et e2e : Mailpit** dans le compose — faux SMTP qui capture
+  tout ; son UI et son API REST permettent aux humains comme aux tests de
+  lire ce qui a réellement été envoyé. Les tests d'intégration vérifient la
+  réception effective, jamais un mock.
+- **Production : Scaleway TEM** (SMTP + STARTTLS) — mono-fournisseur avec
+  l'hébergement, déclaré dans le Terraform existant, DNS (SPF/DKIM) posé
+  par le même outillage que le reste.
+
 ## Ce qui n'est pas encore décidé
 
 - Les choix fins par brique (librairies Python, framework de tests front) —
   décidés au moment où la brique démarre.
-- L'envoi d'e-mails (magic links) — décidé au moment de la tranche auth.

@@ -27,6 +27,9 @@ services:
       ConnectionStrings__Database: "Host=postgres;Database=verbatim;Username=verbatim;Password=verbatim"
       ConnectionStrings__Redis: "redis:6379,password=verbatim"
       Database__MigrateOnStartup: "true"
+      Email__SmtpHost: "mailpit"
+      Email__SmtpPort: "1025"
+      Email__From: "noreply@verbatim.yantech.fr"
     # Lets Testcontainers-driven test runs reach ports published on the
     # Docker host, including on plain Linux (CI runners).
     extra_hosts:
@@ -55,6 +58,19 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  mailpit:
+    # Fake SMTP for dev and e2e: catches every outgoing mail; UI and REST API
+    # on port 8025 let humans and tests read what was actually sent.
+    image: axllent/mailpit@sha256:5a49a77c5bdbe7c5474450b4f46348d09949df3695257729c93a30369382d4f6
+    ports:
+      # Host port 8125 (UI + API), same offset logic as the other services.
+      - "8125:8025"
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   redis:
     image: redis:8-alpine@sha256:9d317178eceac8454a2284a9e6df2466b93c745529947f0cd42a0fa9609d7005

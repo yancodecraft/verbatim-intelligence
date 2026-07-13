@@ -6,6 +6,23 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-13 — La tranche 3 est close : l'ingestion CSV vit en production
+
+**Parcours exercé en réel sur https://verbatim.yantech.fr** : connexion par
+magic link (vrai e-mail) → upload d'un CSV de 15 lignes → 3 colonnes
+détectées à l'aperçu → colonne `comment` désignée → analyse créée avec
+**14 verbatims** (la cellule vide sautée, comme tranché en revue) →
+`succeeded` → la liste du compte montre ses analyses. **Les quatre critères
+de « fini » sont remplis : tests en CI (52 backend, 15 front, 7 worker,
+e2e), revue par agent traitée, parcours réel, en production.**
+
+La journée aura clos les tranches 2 et 3, posé les backups et leur
+restauration prouvée — la tranche 3 ayant été construite par une **session
+autonome** dont le travail a passé revue produit, revue par agent et CI
+sans retouche de fond. Prochaine étape : la **tranche 4, le pipeline
+d'analyse** — la stratégie est déjà tranchée par le spike (découverte par
+batchs + consolidation), ses enseignements consignés ici même.
+
 ## 2026-07-13 — Revue de la tranche 3 : « sound to push », deux suites données
 
 **La session autonome passe la revue par agent** : aucun trou de sécurité,

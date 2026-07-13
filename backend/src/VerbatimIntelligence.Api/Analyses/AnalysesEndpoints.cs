@@ -95,10 +95,38 @@ public static class AnalysesEndpoints
         // before this query even looks.
         group.MapGet("/{id:guid}", async (
             Guid id, AppDbContext db, CancellationToken cancellationToken) =>
-            await db.Analyses.SingleOrDefaultAsync(
-                analysis => analysis.Id == id, cancellationToken) is { } analysis
-                ? Results.Ok(AnalysisResponse.From(analysis))
-                : Results.NotFound());
+        {
+            var analysis = await db.Analyses.SingleOrDefaultAsync(
+                candidate => candidate.Id == id, cancellationToken);
+            if (analysis is null)
+            {
+                return Results.NotFound();
+            }
+
+            // Themes and citations are read through the (already scoped)
+            // analysis; a cited text is the original verbatim row resolved
+            // by its foreign key — never a stored copy.
+            var themes = await db.Themes
+                .Where(theme => theme.AnalysisId == analysis.Id)
+                .OrderBy(theme => theme.Position)
+                .Select(theme => new ThemeResponse(
+                    theme.Name,
+                    theme.Synthesis,
+                    db.ThemeVerbatims.Count(tv => tv.ThemeId == theme.Id),
+                    db.ThemeVerbatims
+                        .Where(tv => tv.ThemeId == theme.Id && tv.Rank != null)
+                        .OrderBy(tv => tv.Rank)
+                        .Join(
+                            db.Verbatims,
+                            tv => tv.VerbatimId,
+                            verbatim => verbatim.Id,
+                            (tv, verbatim) => new RepresentativeResponse(
+                                verbatim.Position, verbatim.Text))
+                        .ToList()))
+                .ToListAsync(cancellationToken);
+
+            return Results.Ok(AnalysisDetailResponse.From(analysis, themes));
+        });
 
         return routes;
     }
@@ -134,8 +162,48 @@ public sealed record AnalysisResponse(
     AnalysisStatus Status,
     DateTimeOffset CreatedAt,
     string SourceFilename,
-    int VerbatimCount)
+    int VerbatimCount,
+    int ProcessedCount,
+    string? Error)
 {
     public static AnalysisResponse From(Analysis analysis) =>
-        new(analysis.Id, analysis.Status, analysis.CreatedAt, analysis.SourceFilename, analysis.VerbatimCount);
+        new(
+            analysis.Id,
+            analysis.Status,
+            analysis.CreatedAt,
+            analysis.SourceFilename,
+            analysis.VerbatimCount,
+            analysis.ProcessedCount,
+            analysis.Error);
+}
+
+public sealed record RepresentativeResponse(int Position, string Text);
+
+public sealed record ThemeResponse(
+    string Name,
+    string Synthesis,
+    int VerbatimCount,
+    IReadOnlyList<RepresentativeResponse> Representatives);
+
+public sealed record AnalysisDetailResponse(
+    Guid Id,
+    AnalysisStatus Status,
+    DateTimeOffset CreatedAt,
+    string SourceFilename,
+    int VerbatimCount,
+    int ProcessedCount,
+    string? Error,
+    IReadOnlyList<ThemeResponse> Themes)
+{
+    public static AnalysisDetailResponse From(
+        Analysis analysis, IReadOnlyList<ThemeResponse> themes) =>
+        new(
+            analysis.Id,
+            analysis.Status,
+            analysis.CreatedAt,
+            analysis.SourceFilename,
+            analysis.VerbatimCount,
+            analysis.ProcessedCount,
+            analysis.Error,
+            themes);
 }

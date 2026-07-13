@@ -76,6 +76,22 @@ test("sign in, upload a CSV, and run an analysis to succeeded", async ({
 		timeout: 15_000,
 	});
 
+	// The cross-brick contract, exercised for real: the backend wrote the
+	// corpus, the worker (stub LLM) wrote themes and citations by reference,
+	// the API reads them back — and a cited text is a fixture line, word for
+	// word, with its source position.
+	const analyses = await (await page.request.get("/api/analyses")).json();
+	const detail = await (
+		await page.request.get(`/api/analyses/${analyses[0].id}`)
+	).json();
+	expect(detail.processedCount).toBe(5);
+	expect(detail.themes.length).toBeGreaterThan(0);
+	const theme = detail.themes[0];
+	expect(theme.synthesis).not.toHaveLength(0);
+	expect(theme.representatives.length).toBeGreaterThan(0);
+	expect(theme.representatives[0].text).toBe("I love the new dashboard");
+	expect(theme.representatives[0].position).toBe(0);
+
 	// Sign out drops the session for real.
 	await page.getByRole("button", { name: "Sign out" }).click();
 	await expect(page).toHaveURL(/\/sign-in$/);

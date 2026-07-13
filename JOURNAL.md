@@ -6,6 +6,27 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-14 — L'API restitue les analyses, et le contrat inter-briques est testé en vrai
+
+Quatrième brique de la tranche 4, en deux volets.
+
+**Le GET s'enrichit.** `GET /analyses/{id}` expose désormais tout ce que le
+worker écrit : progression (`processedCount`), erreur lisible, et les
+thèmes — nom, synthèse, poids (le compte de ses verbatims rattachés,
+calculé, jamais stocké), et les **verbatims représentatifs résolus par
+leur FK** : le texte renvoyé est la ligne d'origine, mot pour mot, avec sa
+position dans le fichier source. La liste (`GET /analyses`) gagne
+progression et erreur, pour que l'écran de la tranche 5 puisse suivre une
+analyse en cours sans requête de plus.
+
+**Le contrat transverse promis par architecture.md existe maintenant en
+vrai.** Le e2e ne s'arrête plus à `succeeded` : il relit l'analyse par
+l'API et vérifie que le cycle complet — le backend a écrit le corpus, le
+vrai worker (LLM stub) a écrit thèmes et rattachements, l'API les relit —
+produit une citation **égale à la ligne du CSV de fixture**, position
+comprise. Deux tests backend l'exercent aussi de l'intérieur (thèmes écrits
+au format worker, relus enrichis ; progression et erreur exposées).
+
 ## 2026-07-13 — Le pipeline du spike devient le pipeline du produit
 
 Troisième brique de la tranche 4 : le worker analyse pour de vrai —

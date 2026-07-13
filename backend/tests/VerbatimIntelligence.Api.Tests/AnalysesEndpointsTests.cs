@@ -23,6 +23,19 @@ public class AnalysesEndpointsTests(ApiFactory factory) : IClassFixture<ApiFacto
     private sealed record AnalysisResponse(
         Guid Id, string Status, DateTimeOffset CreatedAt, string SourceFilename, int VerbatimCount);
 
+    private sealed record RepresentativeResponse(int Position, string Text);
+
+    private sealed record ThemeResponse(
+        string Name, string Synthesis, int VerbatimCount, List<RepresentativeResponse> Representatives);
+
+    private sealed record AnalysisDetailResponse(
+        Guid Id,
+        string Status,
+        int VerbatimCount,
+        int ProcessedCount,
+        string? Error,
+        List<ThemeResponse> Themes);
+
     private sealed record UploadResult(Guid Id, List<string> Columns);
 
     private async Task<HttpClient> SignedInClientAsync()
@@ -221,6 +234,80 @@ public class AnalysesEndpointsTests(ApiFactory factory) : IClassFixture<ApiFacto
         Assert.Equal(second.Id, list[0].Id);
         Assert.Equal(first.Id, list[1].Id);
         Assert.Equal("feedback.csv", list[0].SourceFilename);
+    }
+
+    [Fact]
+    public async Task GetAnalysis_ReturnsThemesWithExactRepresentativeTexts()
+    {
+        var client = await SignedInClientAsync();
+        var analysis = await CreateAnalysisAsync(client);
+
+        // Write results the way the worker does, straight into the schema:
+        // two themes ordered by position, "Too slow" cited by the first one.
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var verbatims = await db.Verbatims
+                .Where(verbatim => verbatim.AnalysisId == analysis.Id)
+                .OrderBy(verbatim => verbatim.Position)
+                .ToListAsync();
+            var performance = new Theme
+            {
+                AnalysisId = analysis.Id,
+                Name = "Performance",
+                Synthesis = "Speed disappoints.",
+                Position = 0,
+            };
+            var praise = new Theme
+            {
+                AnalysisId = analysis.Id,
+                Name = "Praise",
+                Synthesis = "People are happy.",
+                Position = 1,
+            };
+            db.Themes.AddRange(performance, praise);
+            db.ThemeVerbatims.AddRange(
+                new ThemeVerbatim { ThemeId = performance.Id, VerbatimId = verbatims[1].Id, Rank = 0 },
+                new ThemeVerbatim { ThemeId = performance.Id, VerbatimId = verbatims[0].Id },
+                new ThemeVerbatim { ThemeId = praise.Id, VerbatimId = verbatims[0].Id, Rank = 0 });
+            await db.SaveChangesAsync();
+        }
+
+        var detail = await client.GetFromJsonAsync<AnalysisDetailResponse>($"/analyses/{analysis.Id}");
+
+        Assert.NotNull(detail);
+        Assert.Equal(2, detail.Themes.Count);
+        var first = detail.Themes[0];
+        Assert.Equal("Performance", first.Name);
+        Assert.Equal("Speed disappoints.", first.Synthesis);
+        Assert.Equal(2, first.VerbatimCount);
+        // The citation is the original row, word for word, with its source position.
+        var cited = Assert.Single(first.Representatives);
+        Assert.Equal("Too slow", cited.Text);
+        Assert.Equal(1, cited.Position);
+        Assert.Equal("Praise", detail.Themes[1].Name);
+    }
+
+    [Fact]
+    public async Task GetAnalysis_ExposesProgressAndError()
+    {
+        var client = await SignedInClientAsync();
+        var analysis = await CreateAnalysisAsync(client);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.Database.ExecuteSqlAsync(
+                $"UPDATE analyses SET status = 'failed', processed_count = 1, error = 'Analysis stopped at its cost cap.' WHERE id = {analysis.Id}");
+        }
+
+        var detail = await client.GetFromJsonAsync<AnalysisDetailResponse>($"/analyses/{analysis.Id}");
+
+        Assert.NotNull(detail);
+        Assert.Equal("failed", detail.Status, ignoreCase: true);
+        Assert.Equal(1, detail.ProcessedCount);
+        Assert.Equal("Analysis stopped at its cost cap.", detail.Error);
+        Assert.Empty(detail.Themes);
     }
 
     [Fact]

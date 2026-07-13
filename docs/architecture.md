@@ -123,7 +123,9 @@ Postgres :
 - **Un test de contrat transverse** exerce le cycle complet : le backend
   crée analyse + verbatims, le worker les lit et écrit ses résultats, le
   backend les relit. C'est le test qui protège le contrat qu'aucun
-  compilateur ne voit.
+  compilateur ne voit. Il vit dans le e2e : le parcours complet va jusqu'à
+  relire par l'API les thèmes écrits par le vrai worker (LLM stub) et
+  vérifier qu'une citation est une ligne du CSV de fixture, mot pour mot.
 - Le schéma est documenté comme artefact ([schema.md](schema.md)) — il joue
   le rôle qu'aurait un OpenAPI : qui écrit quoi, et ce que chaque table
   garantit. Il se met à jour dans le même commit que toute migration.

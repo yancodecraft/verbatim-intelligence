@@ -38,7 +38,7 @@ public sealed partial class AuthEndpointsTests(ApiFactory factory)
         var client = factory.CreateClient();
 
         var response = await client.PostAsJsonAsync(
-            "/api/auth/magic-link", new { email = "Alice@Example.test " });
+            "/auth/magic-link", new { email = "Alice@Example.test " });
 
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         var body = await ReadSingleMessageBodyAsync("alice@example.test");
@@ -51,9 +51,9 @@ public sealed partial class AuthEndpointsTests(ApiFactory factory)
         var client = factory.CreateClient();
 
         var first = await client.PostAsJsonAsync(
-            "/api/auth/magic-link", new { email = "repeat@example.test" });
+            "/auth/magic-link", new { email = "repeat@example.test" });
         var second = await client.PostAsJsonAsync(
-            "/api/auth/magic-link", new { email = "repeat@example.test" });
+            "/auth/magic-link", new { email = "repeat@example.test" });
 
         Assert.Equal(HttpStatusCode.Accepted, first.StatusCode);
         Assert.Equal(HttpStatusCode.Accepted, second.StatusCode);
@@ -63,17 +63,17 @@ public sealed partial class AuthEndpointsTests(ApiFactory factory)
     public async Task Verify_WithTheMailedToken_EstablishesASession()
     {
         var client = factory.CreateClient();
-        await client.PostAsJsonAsync("/api/auth/magic-link", new { email = "bob@example.test" });
+        await client.PostAsJsonAsync("/auth/magic-link", new { email = "bob@example.test" });
         var token = await ReadMailedTokenAsync("bob@example.test");
 
-        var verify = await client.PostAsJsonAsync("/api/auth/verify", new { token });
+        var verify = await client.PostAsJsonAsync("/auth/verify", new { token });
 
         Assert.Equal(HttpStatusCode.NoContent, verify.StatusCode);
         var cookie = Assert.Single(verify.Headers.GetValues("Set-Cookie"),
             value => value.StartsWith("vi_session=", StringComparison.Ordinal));
         Assert.Contains("httponly", cookie, StringComparison.OrdinalIgnoreCase);
 
-        var me = await client.GetFromJsonAsync<JsonElement>("/api/auth/me");
+        var me = await client.GetFromJsonAsync<JsonElement>("/auth/me");
         Assert.Equal("bob@example.test", me.GetProperty("email").GetString());
     }
 
@@ -81,11 +81,11 @@ public sealed partial class AuthEndpointsTests(ApiFactory factory)
     public async Task Verify_ConsumesTheTokenOnFirstUse()
     {
         var client = factory.CreateClient();
-        await client.PostAsJsonAsync("/api/auth/magic-link", new { email = "once@example.test" });
+        await client.PostAsJsonAsync("/auth/magic-link", new { email = "once@example.test" });
         var token = await ReadMailedTokenAsync("once@example.test");
 
-        var first = await client.PostAsJsonAsync("/api/auth/verify", new { token });
-        var second = await factory.CreateClient().PostAsJsonAsync("/api/auth/verify", new { token });
+        var first = await client.PostAsJsonAsync("/auth/verify", new { token });
+        var second = await factory.CreateClient().PostAsJsonAsync("/auth/verify", new { token });
 
         Assert.Equal(HttpStatusCode.NoContent, first.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, second.StatusCode);
@@ -109,7 +109,7 @@ public sealed partial class AuthEndpointsTests(ApiFactory factory)
         await db.SaveChangesAsync();
 
         var verify = await factory.CreateClient()
-            .PostAsJsonAsync("/api/auth/verify", new { token = raw });
+            .PostAsJsonAsync("/auth/verify", new { token = raw });
 
         Assert.Equal(HttpStatusCode.Unauthorized, verify.StatusCode);
     }
@@ -118,7 +118,7 @@ public sealed partial class AuthEndpointsTests(ApiFactory factory)
     public async Task Verify_RejectsAnUnknownToken()
     {
         var verify = await factory.CreateClient()
-            .PostAsJsonAsync("/api/auth/verify", new { token = Tokens.CreateRaw() });
+            .PostAsJsonAsync("/auth/verify", new { token = Tokens.CreateRaw() });
 
         Assert.Equal(HttpStatusCode.Unauthorized, verify.StatusCode);
     }
@@ -126,7 +126,7 @@ public sealed partial class AuthEndpointsTests(ApiFactory factory)
     [Fact]
     public async Task Me_WithoutASession_Returns401()
     {
-        var me = await factory.CreateClient().GetAsync("/api/auth/me");
+        var me = await factory.CreateClient().GetAsync("/auth/me");
 
         Assert.Equal(HttpStatusCode.Unauthorized, me.StatusCode);
     }
@@ -135,12 +135,12 @@ public sealed partial class AuthEndpointsTests(ApiFactory factory)
     public async Task Logout_RevokesTheSessionServerSide()
     {
         var client = factory.CreateClient();
-        await client.PostAsJsonAsync("/api/auth/magic-link", new { email = "gone@example.test" });
+        await client.PostAsJsonAsync("/auth/magic-link", new { email = "gone@example.test" });
         var token = await ReadMailedTokenAsync("gone@example.test");
-        await client.PostAsJsonAsync("/api/auth/verify", new { token });
+        await client.PostAsJsonAsync("/auth/verify", new { token });
 
-        var logout = await client.PostAsync("/api/auth/logout", content: null);
-        var me = await client.GetAsync("/api/auth/me");
+        var logout = await client.PostAsync("/auth/logout", content: null);
+        var me = await client.GetAsync("/auth/me");
 
         Assert.Equal(HttpStatusCode.NoContent, logout.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, me.StatusCode);

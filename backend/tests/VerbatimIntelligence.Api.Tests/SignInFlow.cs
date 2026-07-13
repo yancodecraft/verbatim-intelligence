@@ -17,7 +17,7 @@ internal static partial class SignInFlow
 
     public static async Task SignInAsync(HttpClient apiClient, Uri mailpitBaseAddress, string email)
     {
-        var requested = await apiClient.PostAsJsonAsync("/api/auth/magic-link", new { email });
+        var requested = await apiClient.PostAsJsonAsync("/auth/magic-link", new { email });
         Assert.Equal(HttpStatusCode.Accepted, requested.StatusCode);
 
         using var mailpit = new HttpClient { BaseAddress = mailpitBaseAddress };
@@ -29,7 +29,7 @@ internal static partial class SignInFlow
             $"api/v1/message/{message.GetProperty("ID").GetString()}");
         var token = TokenPattern().Match(detail.GetProperty("Text").GetString()!).Groups[1].Value;
 
-        var verified = await apiClient.PostAsJsonAsync("/api/auth/verify", new { token });
+        var verified = await apiClient.PostAsJsonAsync("/auth/verify", new { token });
         Assert.Equal(HttpStatusCode.NoContent, verified.StatusCode);
     }
 }

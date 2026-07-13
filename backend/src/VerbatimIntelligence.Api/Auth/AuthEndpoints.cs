@@ -15,7 +15,9 @@ public static class AuthEndpoints
 
     public static void MapAuth(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/auth");
+        // "/auth", not "/api/auth": both proxies (Vite dev, Caddy prod) strip
+        // the /api prefix before forwarding — same contract as /analyses.
+        var group = app.MapGroup("/auth");
 
         group.MapPost("/magic-link", RequestMagicLinkAsync);
         group.MapPost("/verify", VerifyAsync);

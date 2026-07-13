@@ -97,10 +97,13 @@ Postgres :
   `UPDATE … WHERE status = 'pending' … RETURNING` — jamais deux workers sur
   la même analyse, même si un signal est publié deux fois.
 - **Heartbeat** : le worker horodate régulièrement l'analyse qu'il traite.
-- **Reaper** : un processus périodique repasse en `pending` (et republie
-  dans Redis) toute analyse `running` au heartbeat périmé — ou la passe en
-  `failed` après N tentatives. C'est lui qui rend vraie la promesse « si
-  Redis tombe, on ne perd qu'un signal re-publiable ».
+- **Reaper** : un processus périodique (il tourne dans la boucle du worker)
+  repasse en `pending` (et republie dans Redis) toute analyse `running` au
+  heartbeat périmé — ou la passe en `failed` après N tentatives. Il republie
+  aussi les analyses `pending` restées intouchées un timeout entier : c'est
+  ce balayage qui rend vraie la promesse « si Redis tombe, on ne perd qu'un
+  signal re-publiable » — un signal dupliqué est inoffensif, le claim
+  atomique y veille.
 - **Idempotence** : le pipeline purge les résultats partiels d'une analyse
   avant de la (re)traiter — rejouer ne duplique jamais.
 - **Machine à états gardée en base** : deux processus écrivent l'analyse

@@ -41,6 +41,7 @@ ignore = [
     "S101",    # pytest asserts
     "PLR2004", # literal expected values in assertions
     "INP001",  # pytest test dirs are not packages
+    "PLR0913", # keyword-only options on test data helpers
 ]
 
 [tool.mypy]

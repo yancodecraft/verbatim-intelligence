@@ -33,7 +33,7 @@ public sealed class Analysis
     // (heartbeat, retries, progress, spend — see docs/architecture.md,
     // "Résilience du traitement asynchrone"); the backend only reads them.
 
-    /// <summary>Last sign of life of the worker processing this analysis.</summary>
+    /// <summary>Last sign of life: beaten by the processing worker, stamped by the reaper on requeue/republish.</summary>
     public DateTimeOffset? HeartbeatAt { get; init; }
 
     /// <summary>Times a worker claimed this analysis; the reaper fails it past a limit.</summary>

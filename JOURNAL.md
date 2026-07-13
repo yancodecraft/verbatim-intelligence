@@ -6,6 +6,37 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-13 — Le worker devient increvable : heartbeat, reaper, idempotence
+
+Deuxième brique de la tranche 4, en TDD contre un vrai Postgres (17 tests
+worker, 7 avant). Le scénario qui dicte tout : un worker meurt en plein
+traitement — crash, OOM, redéploiement — et sans mécanisme, l'analyse reste
+`running` pour toujours.
+
+Ce qui change :
+
+- **Le claim ouvre une tentative propre** : un seul UPDATE stampe le
+  heartbeat, compte la tentative, efface l'erreur et la progression de la
+  précédente. Puis la **purge** : les `themes` d'une tentative morte sont
+  supprimés avant de retraiter (cascade sur les rattachements) — rejouer ne
+  duplique jamais.
+- **`beat()` entre les étapes du pipeline**, pas de thread : une étape dure
+  au pire un appel LLM, très en dessous du timeout du reaper (5 min). Plus
+  simple, et une connexion unique suffit.
+- **Le reaper tourne dans la boucle du worker** (toutes les 60 s, pas de
+  processus de plus à opérer) : les `running` au heartbeat périmé repartent
+  en file (`attempts` < 3) ou passent en `failed` avec une erreur lisible ;
+  et les `pending` intouchés depuis un timeout entier sont **republiés** —
+  le cas Redis-a-perdu-le-signal, que la promesse d'architecture couvrait
+  sans qu'aucun code ne la tienne. Un signal dupliqué est inoffensif : le
+  claim atomique absorbe tout.
+- **`heartbeat_at` double comme « dernier toucher »** : le reaper l'estampe
+  quand il remet en file, ce qui borne la republication à une par timeout —
+  pas de spam de file quand un backlog attend légitimement.
+- **Un échec de pipeline ne tue jamais la boucle** : rollback des écritures
+  partielles, l'analyse passe en `failed` avec son erreur (montrée à
+  l'utilisateur), le worker continue.
+
 ## 2026-07-13 — Tranche 4 ouverte : le schéma des thèmes, et docs/schema.md
 
 Le pipeline d'analyse commence par son contrat : les tables que le worker

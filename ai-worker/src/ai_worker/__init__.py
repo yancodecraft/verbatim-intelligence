@@ -7,9 +7,14 @@ import psycopg
 import redis
 
 from ai_worker.processing import process_analysis
+from ai_worker.reaper import reap
 from ai_worker.redis_queue import POP_TIMEOUT_SECONDS, pop_analysis_id
 
 RETRY_DELAY_SECONDS = 5
+
+# Kept well under the reaper's staleness timeout so recovery lags a stuck
+# analysis by at most a minute, not another full timeout.
+REAP_INTERVAL_SECONDS = 60
 
 logger = logging.getLogger(__name__)
 
@@ -42,11 +47,16 @@ def main() -> NoReturn:
 
 def _consume(client: redis.Redis, database_url: str) -> NoReturn:
     with psycopg.connect(database_url) as connection:
+        # 0.0 makes the first turn reap: recovery must not wait an interval.
+        next_reap = 0.0
         while True:
+            if time.monotonic() >= next_reap:
+                reap(connection, client)
+                next_reap = time.monotonic() + REAP_INTERVAL_SECONDS
             analysis_id = pop_analysis_id(client)
             if analysis_id is None:
                 continue
             if process_analysis(connection, analysis_id):
-                logger.info("analysis %s succeeded", analysis_id)
+                logger.info("analysis %s concluded", analysis_id)
             else:
                 logger.warning("analysis %s was not claimable", analysis_id)

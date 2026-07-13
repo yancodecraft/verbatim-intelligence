@@ -42,7 +42,7 @@ Le backend **crée** la ligne (`pending`) ; le worker la fait **avancer**.
 |---|---|---|
 | `user_id`, `source_filename`, `verbatim_count`, `created_at` | backend | identité et dénormalisations pour la liste |
 | `status` | les deux | `pending → running → succeeded / failed`, gardé par un CHECK ; transitions par compare-and-set (`UPDATE … WHERE status = …`) |
-| `heartbeat_at` | worker | dernier signe de vie du worker qui traite |
+| `heartbeat_at` | worker/reaper | dernier signe de vie : battu par le worker entre les étapes du pipeline, estampillé par le reaper quand il remet en file ou republie (ce qui borne la fréquence de republication) |
 | `attempts` | worker/reaper | nombre de claims ; au-delà d'un seuil le reaper passe en `failed` |
 | `error` | worker | la cause d'un échec, montrée à l'utilisateur |
 | `processed_count` | worker | verbatims passés par la découverte — la progression |

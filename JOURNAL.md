@@ -6,6 +6,74 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-13 — Session autonome — tranche 3 : l'ingestion CSV de bout en bout
+
+**Fait, en TDD sur le backend, brique par brique verte :** un CSV s'uploade,
+ses colonnes se mappent, ses verbatims se rangent en base, et une analyse
+part dans la file — le tout scopé au compte.
+
+- **`POST /uploads`** applique le contrat CSV de la [spec](docs/v1-spec.md) : UTF-8
+  (BOM toléré), délimiteur auto-détecté, limites 5 Mo / 5 000 lignes / 10 000
+  caractères par cellule, en-têtes requis. Chaque rejet est un **400 au
+  message clair** (fichier vide, pas de l'UTF-8, trop gros, trop de lignes,
+  cellule trop longue, en-têtes manquants) — un test par règle, au niveau du
+  parseur (pur, sans infra) puisque c'est là que vit le risque.
+- **`POST /analyses`** est refondu : body `{uploadId, verbatimColumn}`, 404 si
+  l'upload n'appartient pas au compte (filtre de scoping) ou n'existe pas,
+  400 si la colonne n'existe pas. Il extrait la colonne en **verbatims** et
+  enqueue après commit (pattern existant).
+- **`GET /analyses`** liste les analyses du compte, plus récentes d'abord.
+- **Front** : la home devient la liste (état vide, badges de statut, polling
+  qui s'arrête au statut terminal) ; `/analyses/new` porte le parcours
+  upload → aperçu → choix de colonne → run → retour liste. Les 400 backend
+  s'affichent tels quels. `CreateAnalysis.vue` (le bouton nu de la tranche 1)
+  disparaît.
+- **e2e** : sign-in par magic link → upload d'une fixture (colonne verbatim
+  avec une cellule vide et un `;` dans le texte) → aperçu → colonne → run →
+  la liste atteint `succeeded`. Vérifié en base réelle : la ligne vide est
+  sautée (trou de position préservé), le `;` reste dans le texte,
+  `verbatim_count` = 5.
+
+**Décisions et arbitrages :**
+- **Bibliothèque CSV : CsvHelper 33.1.0** — le standard de facto .NET, quoting
+  et échappement conformes RFC 4180 ; la robustesse prime, l'entrée n'est pas
+  fiable. Détection du délimiteur : `,` vs `;` comptés sur la **ligne
+  d'en-tête**, égalité (ou virgule seule) → `,`.
+- **Colonnes dénormalisées avec défaut en base** (`source_filename`,
+  `verbatim_count` sur `analyses`, NOT NULL DEFAULT) : étape *expand*
+  d'expand/contract. Le backend N-1 et l'INSERT minimal du worker restent
+  valides ; le miroir DDL du worker reprend les défauts et **omet** uploads /
+  verbatims (le worker n'y touche pas). Alternative « colonnes nullables »
+  écartée : le défaut porte mieux l'invariant (toute analyse a un fichier
+  source et un compte de verbatims).
+- **Fidélité par construction** : un verbatim stocke le **texte exact** de la
+  cellule (aucun trim) ; la position est l'index 0-based de la ligne dans le
+  fichier, donc les cellules vides sautées laissent un trou — chaque verbatim
+  pointe toujours vers sa ligne d'origine, ce dont la tranche 4 aura besoin
+  pour citer par référence.
+- **Contenu non fiable traité comme tel dès l'ingestion** : décodage UTF-8
+  strict pour distinguer un binaire d'un CSV, échappement par défaut de Vue
+  (jamais de `v-html`), nom de fichier réduit à sa feuille et borné, limite de
+  corps Kestrel à 6 Mo. L'antiforgery est désactivé sur l'endpoint multipart
+  et c'est assumé : le cookie de session est `SameSite=Lax`, non envoyé sur un
+  POST cross-site — même posture CSRF que les autres écritures.
+
+**Point d'attention pour la revue :** le contrat figé dit des cellules vides
+« ignorées (pas insérées) **mais comptées dans la réponse** ». Je l'ai lu
+comme *`verbatim_count` = nombre de verbatims réellement insérés* (non
+vides) : un verbatim a un `text` NOT NULL, et le champ s'appelle
+verbatimCount. Si l'intention était le total des lignes de la colonne (vides
+comprises), c'est une inversion d'une ligne — à trancher en revue.
+
+**Pièges rencontrés :** le spread `..` exige une expression de collection
+`[...]`, pas `new byte[]{}` ; `dotnet format` ne veut aucune newline finale ;
+un helper de test sans état doit être `static` (CA1822/S2325) ; Biome
+reformate les lignes longues (lancé en `--write` à chaque fois).
+
+**Reste pour clore la tranche** (les 4 critères de « fini ») : la revue par
+agent, le parcours exercé en **production**, et le déploiement — ce sera
+l'arbitrage de Yannick. `make ci` local (sans deploy) est vert.
+
 ## 2026-07-13 — Tranche 3 ouverte : le schéma d'ingestion (uploads, verbatims)
 
 **Fait, en TDD :** le glossaire gagne le terme **Upload** (un CSV soumis et

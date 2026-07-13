@@ -30,6 +30,9 @@ services:
       Email__SmtpHost: "mailpit"
       Email__SmtpPort: "1025"
       Email__From: "noreply@verbatim.yantech.fr"
+      Auth__PublicBaseUrl: "http://localhost:5180"
+      # Dev serves plain HTTP: browsers would drop a Secure cookie.
+      Auth__SecureCookies: "false"
     # Lets Testcontainers-driven test runs reach ports published on the
     # Docker host, including on plain Linux (CI runners).
     extra_hosts:

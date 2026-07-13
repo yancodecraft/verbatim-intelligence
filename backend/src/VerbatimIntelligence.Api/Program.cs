@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
 
 using VerbatimIntelligence.Api.Analyses;
+using VerbatimIntelligence.Api.Auth;
 using VerbatimIntelligence.Api.Data;
 using VerbatimIntelligence.Api.Email;
 
@@ -27,6 +28,9 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 builder.Services.AddOptions<EmailOptions>()
     .BindConfiguration(EmailOptions.SectionName)
     .ValidateOnStart();
+builder.Services.AddOptions<AuthOptions>()
+    .BindConfiguration(AuthOptions.SectionName)
+    .ValidateOnStart();
 builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
 builder.Services.AddHealthChecks().AddDbContextCheck<AppDbContext>();
 
@@ -47,6 +51,7 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 // No UseHttpsRedirection: TLS terminates at the reverse proxy; the app only
 // ever serves plain HTTP inside the compose network.
 app.MapHealthChecks("/health");
+app.MapAuth();
 app.MapAnalyses();
 
 await app.RunAsync();

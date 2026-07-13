@@ -57,5 +57,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Email:SmtpPort",
             _mailpit.GetMappedPublicPort(1025).ToString(System.Globalization.CultureInfo.InvariantCulture));
         builder.UseSetting("Email:From", "noreply@verbatim.test");
+        builder.UseSetting("Auth:PublicBaseUrl", "http://localhost:5180");
+        builder.UseSetting("Auth:SecureCookies", "false");
     }
 }

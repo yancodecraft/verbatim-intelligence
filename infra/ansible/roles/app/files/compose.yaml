@@ -25,6 +25,14 @@ services:
     environment:
       ConnectionStrings__Database: "Host=postgres;Database=verbatim;Username=verbatim;Password=${POSTGRES_PASSWORD}"
       ConnectionStrings__Redis: "redis:6379,password=${REDIS_PASSWORD}"
+      # Magic links go out through Scaleway TEM (see infra/terraform/tem.tf).
+      Email__SmtpHost: "smtp.tem.scaleway.com"
+      Email__SmtpPort: "587"
+      Email__UseStartTls: "true"
+      Email__Username: ${SMTP_USERNAME}
+      Email__Password: ${SMTP_PASSWORD}
+      Email__From: "noreply@verbatim.yantech.fr"
+      Auth__PublicBaseUrl: "https://verbatim.yantech.fr"
     depends_on:
       postgres:
         condition: service_healthy

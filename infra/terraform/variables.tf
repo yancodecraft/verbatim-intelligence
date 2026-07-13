@@ -14,3 +14,9 @@ variable "ssh_public_key" {
   description = "Public key granted SSH access to the instance"
   type        = string
 }
+
+variable "hostinger_api_token" {
+  description = "Hostinger API token (DNS zone management for yantech.fr)"
+  type        = string
+  sensitive   = true
+}

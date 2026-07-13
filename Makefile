@@ -15,11 +15,13 @@ TERRAFORM_IMAGE = hashicorp/terraform@sha256:7ae513256f7ce67879e218ae8593d6fbe21
 SCW_CONFIG = $(HOME)/.config/scw/config.yaml
 TF_ENV = AWS_ACCESS_KEY_ID=$$(awk '$$1=="access_key:"{print $$2}' "$(SCW_CONFIG)") \
          AWS_SECRET_ACCESS_KEY=$$(awk '$$1=="secret_key:"{print $$2}' "$(SCW_CONFIG)") \
-         TF_VAR_ssh_public_key="$$(cat "$(HOME)/.ssh/verbatim_ed25519.pub")"
+         TF_VAR_ssh_public_key="$$(cat "$(HOME)/.ssh/verbatim_ed25519.pub")" \
+         TF_VAR_hostinger_api_token=$$(awk '$$1=="api_token:"{print $$2}' "$(HOME)/.hapi.yaml")
 TF_RUN = docker run --rm \
          -v "$(CURDIR)/infra/terraform":/infra \
          -v "$(SCW_CONFIG)":/root/.config/scw/config.yaml:ro \
          -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e TF_VAR_ssh_public_key \
+         -e TF_VAR_hostinger_api_token \
          $(TERRAFORM_IMAGE)
 
 # Named volumes holding in-container dependencies. They are seeded from the

@@ -6,6 +6,12 @@ terraform {
       source  = "scaleway/scaleway"
       version = "~> 2.78"
     }
+
+    # The yantech.fr DNS zone lives at Hostinger.
+    hostinger = {
+      source  = "hostinger/hostinger"
+      version = "~> 0.1.22"
+    }
   }
 
   # Scaleway Object Storage, S3-compatible. Credentials come from the
@@ -30,4 +36,8 @@ terraform {
 provider "scaleway" {
   zone   = var.zone
   region = "fr-par"
+}
+
+provider "hostinger" {
+  api_token = var.hostinger_api_token
 }

@@ -6,6 +6,38 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-13 — Les magic links partent en prod : Scaleway TEM, déclaré
+
+**Fait :** la chaîne d'envoi de production est déclarée dans le Terraform
+existant : domaine TEM `verbatim.yantech.fr` (offre `essential`, 300
+e-mails/mois inclus — large pour des magic links), enregistrements
+SPF/DKIM/MX/DMARC posés chez Hostinger (le provider Terraform
+`hostinger/hostinger` gère la zone), **validation du domaine par Scaleway
+réussie en ~1 min**, et des credentials d'envoi dédiés au moindre
+privilège (application IAM + `TransactionalEmailEmailFullAccess` seulement
+— pas d'administration de domaine). Le mot de passe SMTP est le secret de
+cette clé : lu des outputs Terraform, posé dans les secrets de prod hors
+repo, jamais affiché ni commité. Le compose de prod passe la config SMTP
+au backend (STARTTLS sur smtp.tem.scaleway.com:587).
+
+**Pièges rencontrés, tous consignés dans le code :**
+- TEM exige une **souscription d'offre préalable** (« No active offer
+  subscription ») — pas de ressource Terraform pour ça : one-shot
+  documenté via le CLI scaleway en conteneur, comme `infra-bootstrap`.
+- La politique de l'organisation **impose une date d'expiration aux clés
+  API** : `expires_at` posé à un an, procédure de rotation commentée dans
+  `tem.tf`.
+- Le provider Hostinger (0.1.22) **perd les enregistrements TXT longs** :
+  l'API les renvoie découpés en chunks quotés, la comparaison échoue, et
+  le provider conclut que le record n'existe pas. DKIM et DMARC sont donc
+  posés mais volontairement non déclarés (commentaire dans `tem.tf` avec
+  la procédure de re-création) ; SPF et MX restent déclaratifs, et la
+  ressource de validation TEM vérifie de fait la présence de l'ensemble.
+- Leçon .NET au passage : `ValidateOnStart()` **sans validateur enregistré
+  ne matérialise pas les options** — le déploiement intermédiaire sans
+  config SMTP a booté sain au lieu d'échouer vite. Le fail-fast viendra
+  d'un validateur réel quand le besoin le justifiera.
+
 ## 2026-07-13 — L'auth de bout en bout : magic link, sessions, scoping mécanique
 
 **Fait, en TDD brique par brique :**

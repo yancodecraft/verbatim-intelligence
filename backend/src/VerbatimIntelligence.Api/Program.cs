@@ -32,6 +32,7 @@ builder.Services.AddOptions<AuthOptions>()
     .BindConfiguration(AuthOptions.SectionName)
     .ValidateOnStart();
 builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
+builder.Services.AddScoped<CurrentAccountAccessor>();
 builder.Services.AddHealthChecks().AddDbContextCheck<AppDbContext>();
 
 var app = builder.Build();

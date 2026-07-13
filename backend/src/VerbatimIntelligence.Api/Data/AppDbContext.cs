@@ -5,8 +5,17 @@ using VerbatimIntelligence.Api.Auth;
 
 namespace VerbatimIntelligence.Api.Data;
 
-public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+public sealed class AppDbContext(
+    DbContextOptions<AppDbContext> options,
+    CurrentAccountAccessor currentAccount) : DbContext(options)
 {
+    // Evaluated per query by the global filters below (see practices.md,
+    // "scoping mécanique"): with an account resolved, scoped entities are
+    // filtered to it — a handler cannot forget. Without one (migrations,
+    // health, schema tests), filters are open: those paths carry no
+    // caller-supplied ids.
+    private Guid? CurrentUserId => currentAccount.UserId;
+
     public DbSet<Analysis> Analyses => Set<Analysis>();
 
     public DbSet<User> Users => Set<User>();
@@ -32,6 +41,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.HasOne<User>().WithMany()
                 .HasForeignKey(analysis => analysis.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasQueryFilter(analysis =>
+                CurrentUserId == null || analysis.UserId == CurrentUserId);
         });
 
         modelBuilder.Entity<User>(entity =>

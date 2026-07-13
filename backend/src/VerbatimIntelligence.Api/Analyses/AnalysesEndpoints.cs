@@ -37,13 +37,13 @@ public static class AnalysesEndpoints
             return Results.Created($"/analyses/{analysis.Id}", AnalysisResponse.From(analysis));
         });
 
-        // Another account's analysis is a plain 404: the response must not
-        // reveal that the id exists at all.
+        // Another account's analysis is a plain 404, indistinguishable from
+        // a non-existent id: the global query filter (AppDbContext) hides it
+        // before this query even looks.
         group.MapGet("/{id:guid}", async (
-            Guid id, HttpContext http, AppDbContext db, CancellationToken cancellationToken) =>
+            Guid id, AppDbContext db, CancellationToken cancellationToken) =>
             await db.Analyses.SingleOrDefaultAsync(
-                analysis => analysis.Id == id && analysis.UserId == http.CurrentUser().Id,
-                cancellationToken) is { } analysis
+                analysis => analysis.Id == id, cancellationToken) is { } analysis
                 ? Results.Ok(AnalysisResponse.From(analysis))
                 : Results.NotFound());
 

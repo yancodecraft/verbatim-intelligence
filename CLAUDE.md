@@ -24,10 +24,10 @@ Ce qu'on sait déjà : ce sera une **app SaaS, sur le web**.
    [docs/architecture.md](docs/architecture.md), découpage en tranches dans
    [docs/roadmap.md](docs/roadmap.md).
 3. **Construire, tranche par tranche** — voir la roadmap. ← on en est là
-   (tranche 1 finie : le squelette tourne en production sur
-   https://verbatim.yantech.fr avec CI/CD complet ; spike pipeline fait,
-   verdict au journal : découverte par batchs + consolidation ; à suivre :
-   tranche 2, l'auth par magic link).
+   (tranches 1 et 2 finies : squelette + auth par magic link en production
+   sur https://verbatim.yantech.fr ; spike pipeline fait, verdict au
+   journal : découverte par batchs + consolidation ; à suivre : tranche 3,
+   l'ingestion CSV — **prérequis : les backups Postgres**).
 
 Une tranche n'est « finie » que testée, exercée réellement, et déployée.
 

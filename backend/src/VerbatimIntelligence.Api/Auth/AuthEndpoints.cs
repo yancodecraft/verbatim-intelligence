@@ -13,6 +13,15 @@ public static class AuthEndpoints
     private static readonly TimeSpan LoginTokenLifetime = TimeSpan.FromMinutes(15);
     private static readonly TimeSpan SessionLifetime = TimeSpan.FromDays(30);
 
+    // Rate limits live in the database (login_tokens is the ledger): they
+    // hold across restarts and replicas, and need no client IP — the
+    // per-address cap is what stops mailbox bombing, the global cap protects
+    // the TEM quota. See docs/practices.md ("rate limiting" on magic links).
+    private const int MaxLinksPerAddress = 5;
+    private static readonly TimeSpan PerAddressWindow = TimeSpan.FromMinutes(15);
+    private const int MaxLinksGlobal = 30;
+    private static readonly TimeSpan GlobalWindow = TimeSpan.FromMinutes(5);
+
     public static void MapAuth(this IEndpointRouteBuilder app)
     {
         // "/auth", not "/api/auth": both proxies (Vite dev, Caddy prod) strip
@@ -53,7 +62,7 @@ public static class AuthEndpoints
         TimeProvider clock,
         CancellationToken cancellationToken)
     {
-        var email = request.Email.Trim().ToLowerInvariant();
+        var email = request.Email?.Trim().ToLowerInvariant() ?? "";
         if (email.Length is 0 or > 320 || !email.Contains('@', StringComparison.Ordinal))
         {
             return TypedResults.ValidationProblem(new Dictionary<string, string[]>
@@ -70,6 +79,18 @@ public static class AuthEndpoints
             // The account is born on first sign-in attempt (see glossary).
             user = new User { Email = email, CreatedAt = now };
             db.Users.Add(user);
+        }
+
+        var addressWindowStart = now.Subtract(PerAddressWindow);
+        var globalWindowStart = now.Subtract(GlobalWindow);
+        var recentForAddress = await db.LoginTokens.CountAsync(
+            token => token.UserId == user.Id && token.CreatedAt > addressWindowStart,
+            cancellationToken);
+        var recentGlobal = await db.LoginTokens.CountAsync(
+            token => token.CreatedAt > globalWindowStart, cancellationToken);
+        if (recentForAddress >= MaxLinksPerAddress || recentGlobal >= MaxLinksGlobal)
+        {
+            return TypedResults.StatusCode(StatusCodes.Status429TooManyRequests);
         }
 
         var rawToken = Tokens.CreateRaw();
@@ -104,6 +125,11 @@ public static class AuthEndpoints
         TimeProvider clock,
         CancellationToken cancellationToken)
     {
+        if (string.IsNullOrEmpty(request.Token))
+        {
+            return TypedResults.Unauthorized();
+        }
+
         var hash = Tokens.Hash(request.Token);
         var now = clock.GetUtcNow();
         var loginToken = await db.LoginTokens.SingleOrDefaultAsync(
@@ -167,9 +193,9 @@ public static class AuthEndpoints
         return TypedResults.NoContent();
     }
 
-    private sealed record MagicLinkRequest(string Email);
+    private sealed record MagicLinkRequest(string? Email);
 
-    private sealed record VerifyRequest(string Token);
+    private sealed record VerifyRequest(string? Token);
 
     private sealed record MeResponse(string Email);
 }

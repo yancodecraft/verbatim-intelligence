@@ -6,6 +6,53 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-13 — Revue de la tranche 2 par agent : trois findings, tous traités
+
+**Verdict initial : « pas de clôture en l'état »** — la revue a confronté le
+code aux promesses écrites du projet, exactement son rôle :
+- **Le scoping n'était pas « mécanique »** : practices.md promet un global
+  query filter EF Core, le code n'avait qu'un `WHERE` manuel dans l'unique
+  endpoint scopé — le prochain endpoint pouvait l'oublier (IDOR silencieux).
+  → Traité : `CurrentAccountAccessor` (scoped) armé par `RequireAccount()`,
+  **`HasQueryFilter` sur `analyses`** — une entité scopée est invisible hors
+  de son compte avant même que la requête regarde. Le `WHERE` manuel a
+  disparu et le test « B reçoit 404 sur la ressource de A » passe par le
+  filtre seul.
+- **Pas de rate limiting sur les magic links**, invariant pourtant écrit.
+  → Traité : limites tenues **en base** (`login_tokens` est le registre —
+  elles survivent aux redémarrages et réplicas, sans dépendre d'une IP
+  derrière le proxy) : 5 liens / 15 min par adresse (anti mail-bombing),
+  30 / 5 min global (protège le quota TEM). Testé (le 6ᵉ → 429).
+- **Un body JSON vide faisait un 500 brut** sur les deux endpoints anonymes
+  (System.Text.Json passe `null` aux paramètres manquants sans erreur).
+  → Traité : champs optionnels validés explicitement — 400 sur l'e-mail
+  manquant, 401 sur le token manquant. Testés.
+
+Notés sans blocage : UUIDv7 est ordonné dans le temps (la roadmap dit
+« non séquentiels » — acceptable car jamais énumérable hors compte, à
+retrancher si un usage public apparaît) ; une course théorique sur la
+création simultanée d'un même compte (500 occasionnel, sans corruption).
+
+## 2026-07-13 — Le parcours auth exercé en production, par son premier utilisateur réel
+
+**Vérifié en réel sur https://verbatim.yantech.fr** : demande de magic link
+→ e-mail reçu dans une vraie boîte Gmail (ni spam ni promotion — SPF/DKIM
+font leur travail) → connexion → session → **analyse créée et `succeeded`**
+à travers toute la pile → rejeu du token refusé (401, usage unique) →
+logout → session révoquée côté serveur (401). Détail savoureux : pendant la
+vérification scriptée, Yannick a cliqué ses propres magic links dans son
+navigateur — les 401 observés sur les premiers tokens étaient *sa*
+consommation, le single-use en action. La première connexion utilisateur
+réelle du produit a donc précédé la vérification officielle.
+
+**Dernier piège levé** : les instances Scaleway droppent le SMTP sortant
+sur les ports standard (anti-spam), même avec une politique de sortie
+`accept` — c'est le rôle des règles de sécurité par défaut. TEM expose le
+port **2587** exactement pour ça : le backend l'utilise, et le security
+group garde ses protections. (Diagnostic : `magic-link` qui bloque
+> 2 min, confirmé par un test de connectivité TCP depuis le serveur —
+587 bloqué, 2587 ouvert.)
+
 ## 2026-07-13 — Les magic links partent en prod : Scaleway TEM, déclaré
 
 **Fait :** la chaîne d'envoi de production est déclarée dans le Terraform

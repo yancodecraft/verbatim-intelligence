@@ -124,6 +124,42 @@ public sealed partial class AuthEndpointsTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task RequestMagicLink_WithoutAnEmail_Returns400()
+    {
+        var response = await factory.CreateClient().PostAsJsonAsync(
+            "/auth/magic-link", new { });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Verify_WithoutAToken_Returns401()
+    {
+        var response = await factory.CreateClient().PostAsJsonAsync(
+            "/auth/verify", new { });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task RequestMagicLink_IsRateLimitedPerAddress()
+    {
+        var client = factory.CreateClient();
+
+        for (var i = 0; i < 5; i++)
+        {
+            var accepted = await client.PostAsJsonAsync(
+                "/auth/magic-link", new { email = "flooded@example.test" });
+            Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
+        }
+
+        var throttled = await client.PostAsJsonAsync(
+            "/auth/magic-link", new { email = "flooded@example.test" });
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, throttled.StatusCode);
+    }
+
+    [Fact]
     public async Task Me_WithoutASession_Returns401()
     {
         var me = await factory.CreateClient().GetAsync("/auth/me");

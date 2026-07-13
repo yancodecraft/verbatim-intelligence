@@ -27,6 +27,9 @@ public static class CurrentAccount
             }
 
             http.Items[ItemKey] = user;
+            // Arms the global query filters: from here on, account-scoped
+            // entities are invisible unless they belong to this account.
+            http.RequestServices.GetRequiredService<CurrentAccountAccessor>().UserId = user.Id;
             return await next(context);
         });
 

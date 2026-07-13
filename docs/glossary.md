@@ -18,8 +18,17 @@ Les termes récurrents des documents du projet, dans leur sens précis ici.
   synthèses + verbatims rattachés.
 - **Mapping** (`ColumnMapping` dans le code) — l'étape d'upload où
   l'utilisateur désigne quelle colonne du CSV contient le verbatim.
+- **Compte** (`User` dans le code) — l'identité d'un utilisateur, réduite en
+  V1 à son adresse e-mail. Créé à la première connexion (pas d'inscription
+  séparée) ; toute donnée (analyses, corpus) appartient à exactement un
+  compte.
 - **Magic link** — le mécanisme d'authentification de la V1 : un lien de
-  connexion à usage unique envoyé par e-mail. Pas de mot de passe.
+  connexion à usage unique envoyé par e-mail. Pas de mot de passe. Porté par
+  un **`LoginToken`** : aléatoire fort, stocké **hashé**, expirant vite,
+  consommé au premier usage.
+- **Session** — la connexion établie d'un compte : un token opaque en cookie
+  `httpOnly`, adossé à une ligne en base (stockée hashée), donc révocable
+  côté serveur.
 - **Rapport partageable** — un lien public en lecture seule vers une analyse,
   porté par un **`ShareToken`** : non devinable, révocable et non indexable.
 

@@ -27,8 +27,14 @@ REDIS_IMAGE = (
 # Provisional mirror of the EF Core migration (the schema owner), until the
 # cross-language contract test lands (see docs/architecture.md).
 ANALYSES_DDL = """
+CREATE TABLE users (
+    id uuid PRIMARY KEY,
+    email varchar(320) NOT NULL UNIQUE,
+    created_at timestamptz NOT NULL
+);
 CREATE TABLE analyses (
     id uuid PRIMARY KEY,
+    user_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
     status varchar(16) NOT NULL,
     created_at timestamptz NOT NULL,
     CONSTRAINT ck_analyses_status
@@ -47,6 +53,7 @@ def database_url() -> Iterator[str]:
 def connection(database_url: str) -> Iterator[psycopg.Connection]:
     with psycopg.connect(database_url) as conn:
         conn.execute("DROP TABLE IF EXISTS analyses")
+        conn.execute("DROP TABLE IF EXISTS users")
         conn.execute(ANALYSES_DDL)
         conn.commit()
         yield conn
@@ -60,9 +67,15 @@ def redis_client() -> Iterator[redis.Redis]:
 
 def insert_analysis(connection: psycopg.Connection, status: str) -> uuid.UUID:
     analysis_id = uuid.uuid4()
+    user_id = uuid.uuid4()
     connection.execute(
-        "INSERT INTO analyses (id, status, created_at) VALUES (%s, %s, %s)",
-        (analysis_id, status, datetime.now(tz=UTC)),
+        "INSERT INTO users (id, email, created_at) VALUES (%s, %s, %s)",
+        (user_id, f"{user_id}@example.test", datetime.now(tz=UTC)),
+    )
+    connection.execute(
+        "INSERT INTO analyses (id, user_id, status, created_at)"
+        " VALUES (%s, %s, %s, %s)",
+        (analysis_id, user_id, status, datetime.now(tz=UTC)),
     )
     connection.commit()
     return analysis_id

@@ -1,5 +1,8 @@
+using Microsoft.EntityFrameworkCore;
+
 using StackExchange.Redis;
 
+using VerbatimIntelligence.Api.Auth;
 using VerbatimIntelligence.Api.Data;
 
 namespace VerbatimIntelligence.Api.Analyses;
@@ -8,15 +11,20 @@ public static class AnalysesEndpoints
 {
     public static IEndpointRouteBuilder MapAnalyses(this IEndpointRouteBuilder routes)
     {
-        var group = routes.MapGroup("/analyses");
+        var group = routes.MapGroup("/analyses").RequireAccount();
 
         group.MapPost("/", async (
+            HttpContext http,
             AppDbContext db,
             IConnectionMultiplexer redis,
             TimeProvider clock,
             CancellationToken cancellationToken) =>
         {
-            var analysis = new Analysis { CreatedAt = clock.GetUtcNow() };
+            var analysis = new Analysis
+            {
+                UserId = http.CurrentUser().Id,
+                CreatedAt = clock.GetUtcNow(),
+            };
             db.Analyses.Add(analysis);
             await db.SaveChangesAsync(cancellationToken);
 
@@ -29,8 +37,13 @@ public static class AnalysesEndpoints
             return Results.Created($"/analyses/{analysis.Id}", AnalysisResponse.From(analysis));
         });
 
-        group.MapGet("/{id:guid}", async (Guid id, AppDbContext db, CancellationToken cancellationToken) =>
-            await db.Analyses.FindAsync([id], cancellationToken) is { } analysis
+        // Another account's analysis is a plain 404: the response must not
+        // reveal that the id exists at all.
+        group.MapGet("/{id:guid}", async (
+            Guid id, HttpContext http, AppDbContext db, CancellationToken cancellationToken) =>
+            await db.Analyses.SingleOrDefaultAsync(
+                analysis => analysis.Id == id && analysis.UserId == http.CurrentUser().Id,
+                cancellationToken) is { } analysis
                 ? Results.Ok(AnalysisResponse.From(analysis))
                 : Results.NotFound());
 

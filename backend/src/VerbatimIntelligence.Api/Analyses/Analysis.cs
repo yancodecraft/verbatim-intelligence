@@ -16,6 +16,9 @@ public sealed class Analysis
 {
     public Guid Id { get; init; } = Guid.CreateVersion7();
 
+    /// <summary>The owning account: every analysis belongs to exactly one.</summary>
+    public required Guid UserId { get; init; }
+
     public AnalysisStatus Status { get; private set; } = AnalysisStatus.Pending;
 
     public required DateTimeOffset CreatedAt { get; init; }

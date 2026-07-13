@@ -3,14 +3,42 @@ using System.Net.Http.Json;
 
 namespace VerbatimIntelligence.Api.Tests;
 
+/// <summary>
+/// Analyses are account-scoped: no session means 401, and another account's
+/// analysis is a 404 — indistinguishable from a non-existent one.
+/// </summary>
 public class AnalysesEndpointsTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
     private sealed record AnalysisResponse(Guid Id, string Status, DateTimeOffset CreatedAt);
 
+    private async Task<HttpClient> SignedInClientAsync()
+    {
+        var client = factory.CreateClient();
+        await SignInFlow.SignInAsync(
+            client, factory.MailpitApiBaseAddress, $"{Guid.NewGuid():N}@example.test");
+        return client;
+    }
+
+    [Fact]
+    public async Task PostAnalyses_WithoutASession_Returns401()
+    {
+        var response = await factory.CreateClient().PostAsync("/analyses", content: null);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetAnalysis_WithoutASession_Returns401()
+    {
+        var response = await factory.CreateClient().GetAsync($"/analyses/{Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
     [Fact]
     public async Task PostAnalyses_CreatesPendingAnalysis()
     {
-        var client = factory.CreateClient();
+        var client = await SignedInClientAsync();
 
         var response = await client.PostAsync("/analyses", content: null);
 
@@ -25,7 +53,7 @@ public class AnalysesEndpointsTests(ApiFactory factory) : IClassFixture<ApiFacto
     [Fact]
     public async Task GetAnalyses_ReturnsCreatedAnalysis()
     {
-        var client = factory.CreateClient();
+        var client = await SignedInClientAsync();
         var created = await (await client.PostAsync("/analyses", content: null))
             .Content.ReadFromJsonAsync<AnalysisResponse>();
         Assert.NotNull(created);
@@ -40,9 +68,23 @@ public class AnalysesEndpointsTests(ApiFactory factory) : IClassFixture<ApiFacto
     }
 
     [Fact]
+    public async Task GetAnalysis_OfAnotherAccount_Returns404()
+    {
+        var owner = await SignedInClientAsync();
+        var created = await (await owner.PostAsync("/analyses", content: null))
+            .Content.ReadFromJsonAsync<AnalysisResponse>();
+        Assert.NotNull(created);
+
+        var intruder = await SignedInClientAsync();
+        var response = await intruder.GetAsync($"/analyses/{created.Id}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task PostAnalyses_EnqueuesAnalysisId()
     {
-        var client = factory.CreateClient();
+        var client = await SignedInClientAsync();
 
         var created = await (await client.PostAsync("/analyses", content: null))
             .Content.ReadFromJsonAsync<AnalysisResponse>();
@@ -58,7 +100,7 @@ public class AnalysesEndpointsTests(ApiFactory factory) : IClassFixture<ApiFacto
     [Fact]
     public async Task GetAnalyses_ReturnsNotFoundForUnknownId()
     {
-        var client = factory.CreateClient();
+        var client = await SignedInClientAsync();
 
         var response = await client.GetAsync($"/analyses/{Guid.NewGuid()}");
 

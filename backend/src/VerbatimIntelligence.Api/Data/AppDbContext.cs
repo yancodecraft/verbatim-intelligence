@@ -28,6 +28,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             entity.Property(analysis => analysis.Status)
                 .HasConversion(status => ToDb(status), value => FromDb(value))
                 .HasMaxLength(16);
+
+            entity.HasOne<User>().WithMany()
+                .HasForeignKey(analysis => analysis.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<User>(entity =>

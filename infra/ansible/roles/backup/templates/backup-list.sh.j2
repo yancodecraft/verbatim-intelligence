@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+set -a; . /opt/verbatim/backup.env; set +a
+exec docker run --rm \
+  -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY \
+  {{ aws_cli_image }} \
+  --endpoint-url https://s3.fr-par.scw.cloud --region fr-par \
+  s3 ls "s3://$BACKUP_BUCKET/"

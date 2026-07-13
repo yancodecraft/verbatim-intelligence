@@ -6,6 +6,28 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-13 — Les backups Postgres : chiffrés, hors machine, restaurés en vrai
+
+**Le prérequis de la tranche 3 est rempli.** Chaque nuit, un timer systemd
+fait `pg_dump` → `age` → bucket Object Storage versionné (rétention
+30 jours). Le design tient en une asymétrie : le serveur ne détient que la
+**clé publique** de chiffrement — il produit des backups qu'il ne peut pas
+lire — et ses credentials S3 dédiés ne savent pas réécrire l'historique
+(bucket versionné). La clé privée `age` vit hors ligne côté opérateur.
+
+**La restauration est exercée, pas espérée** : `make backup-restore-test`
+télécharge le dernier backup réel, le déchiffre localement, le restaure
+dans un Postgres jetable et vérifie le contenu — passé en réel sur le
+backup du jour (1 compte, 2 analyses, 2 sessions restaurés). Le playbook
+lance d'ailleurs un backup immédiat à chaque changement du pipeline et
+échoue si l'objet du jour manque au bucket.
+
+**Pièges du jour** : `source` sans `set -a` ne propage rien à
+`docker run -e` (« Unable to locate credentials ») ; et sur Scaleway, une
+clé API d'application doit porter `default_project_id` pour qu'Object
+Storage accepte ses écritures — sans lui, `AccessDenied` sur le bucket du
+projet.
+
 ## 2026-07-13 — Revue de la tranche 2 par agent : trois findings, tous traités
 
 **Verdict initial : « pas de clôture en l'état »** — la revue a confronté le

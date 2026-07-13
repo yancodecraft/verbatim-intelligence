@@ -8,7 +8,9 @@
     - /secrets/prod.yml
   vars:
     app_domain: verbatim.yantech.fr
+    aws_cli_image: amazon/aws-cli@sha256:238583846e731f31c9848dae26c5a560769ff35c4c5368a4cb6be5816683e485
   roles:
     - hardening
     - docker
     - app
+    - backup

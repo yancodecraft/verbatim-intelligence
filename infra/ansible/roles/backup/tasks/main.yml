@@ -1,0 +1,85 @@
+# Encrypted Postgres backups (the slice-3 prerequisite, docs/architecture.md):
+# a systemd timer dumps the database daily, encrypts it with the *public*
+# age key (the server cannot read its own backups), and ships it to a
+# versioned Object Storage bucket. Restore is exercised from a workstation
+# holding the private key: make backup-restore-test.
+- name: Install age (encryption)
+  ansible.builtin.apt:
+    name: age
+    state: present
+
+- name: Template the backup environment (S3 credentials, 0600)
+  ansible.builtin.template:
+    src: backup.env.j2
+    dest: /opt/verbatim/backup.env
+    mode: "0600"
+  register: backup_env
+
+- name: Install the backup script
+  ansible.builtin.template:
+    src: backup.sh.j2
+    dest: /opt/verbatim/backup.sh
+    mode: "0755"
+  register: backup_script
+
+- name: Install the backup listing helper
+  ansible.builtin.template:
+    src: backup-list.sh.j2
+    dest: /opt/verbatim/backup-list.sh
+    mode: "0755"
+
+- name: Install the backup systemd service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/verbatim-backup.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Encrypted Postgres backup to Object Storage
+      Requires=docker.service
+      After=docker.service
+
+      [Service]
+      Type=oneshot
+      ExecStart=/opt/verbatim/backup.sh
+
+- name: Install the backup systemd timer (daily)
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/verbatim-backup.timer
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Daily encrypted Postgres backup
+
+      [Timer]
+      OnCalendar=*-*-* 03:14:00 UTC
+      RandomizedDelaySec=15m
+      Persistent=true
+
+      [Install]
+      WantedBy=timers.target
+  register: backup_timer
+
+- name: Enable and start the timer
+  ansible.builtin.systemd_service:
+    name: verbatim-backup.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+
+# A backup pipeline that has never run is a hope, not a backup: whenever
+# the pipeline changes, run it now and fail the play if today's object is
+# missing from the bucket.
+- name: Run a backup right away
+  ansible.builtin.systemd_service:
+    name: verbatim-backup.service
+    state: started
+  when: backup_env.changed or backup_script.changed or backup_timer.changed
+
+- name: Smoke test — today's backup exists in the bucket
+  ansible.builtin.command:
+    argv:
+      - /opt/verbatim/backup-list.sh
+  register: backup_listing
+  changed_when: false
+  failed_when: "ansible_date_time.date not in backup_listing.stdout"
+  when: backup_env.changed or backup_script.changed or backup_timer.changed

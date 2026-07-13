@@ -156,6 +156,16 @@ sur l'hôte (réseau Docker interne uniquement, Redis avec mot de passe) ;
 secrets en variables d'environnement hors repo ; backups Postgres
 automatiques, chiffrés, hors de la machine, avec restauration testée.
 
+**Backups, le mécanisme** : un timer systemd (posé par Ansible) fait chaque
+nuit `pg_dump` → chiffrement `age` → bucket Object Storage dédié, versionné,
+rétention 30 jours. Asymétrie voulue : le serveur ne détient que la **clé
+publique** — il chiffre des backups qu'il ne peut pas lire, et ses
+credentials S3 (dédiés, moindre privilège) ne savent pas purger l'historique
+versionné. La clé privée vit hors ligne, côté opérateur. La restauration
+n'est pas un espoir mais une commande : `make backup-restore-test`
+télécharge le dernier backup, le déchiffre localement et le restaure dans
+un Postgres jetable en vérifiant le contenu — exercée en réel.
+
 ## E-mails transactionnels (magic links)
 
 Le backend parle **SMTP** (MailKit) derrière une abstraction minimale

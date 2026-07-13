@@ -16,12 +16,13 @@ SCW_CONFIG = $(HOME)/.config/scw/config.yaml
 TF_ENV = AWS_ACCESS_KEY_ID=$$(awk '$$1=="access_key:"{print $$2}' "$(SCW_CONFIG)") \
          AWS_SECRET_ACCESS_KEY=$$(awk '$$1=="secret_key:"{print $$2}' "$(SCW_CONFIG)") \
          TF_VAR_ssh_public_key="$$(cat "$(HOME)/.ssh/verbatim_ed25519.pub")" \
-         TF_VAR_hostinger_api_token=$$(awk '$$1=="api_token:"{print $$2}' "$(HOME)/.hapi.yaml")
+         TF_VAR_hostinger_api_token=$$(awk '$$1=="api_token:"{print $$2}' "$(HOME)/.hapi.yaml") \
+         TF_VAR_project_id=$$(awk '$$1=="default_project_id:"{print $$2}' "$(SCW_CONFIG)")
 TF_RUN = docker run --rm \
          -v "$(CURDIR)/infra/terraform":/infra \
          -v "$(SCW_CONFIG)":/root/.config/scw/config.yaml:ro \
          -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e TF_VAR_ssh_public_key \
-         -e TF_VAR_hostinger_api_token \
+         -e TF_VAR_hostinger_api_token -e TF_VAR_project_id \
          $(TERRAFORM_IMAGE)
 
 # Named volumes holding in-container dependencies. They are seeded from the
@@ -30,7 +31,7 @@ DEP_VOLUMES = verbatim-intelligence_frontend_node_modules \
               verbatim-intelligence_backend_nuget \
               verbatim-intelligence_ai_worker_venv
 
-.PHONY: help up down rebuild logs ps psql lint audit test e2e ci outdated \
+.PHONY: help up down rebuild logs ps psql lint audit test e2e ci outdated backup-restore-test \
         infra-bootstrap infra-init infra-plan infra-apply infra-output configure deploy
 
 help: ## List available targets
@@ -131,6 +132,9 @@ configure deploy: ## Converge the server: hardening, Docker, the app stack
 	  -v "$(HOME)/.ssh/verbatim_ed25519":/keys/verbatim_ed25519:ro \
 	  -v "$(HOME)/.config/verbatim-intelligence/prod-secrets.yml":/secrets/prod.yml:ro \
 	  verbatim-ansible site.yml $(if $(TAG),-e tag=$(TAG),)
+
+backup-restore-test: ## Restore drill: latest backup -> throwaway Postgres, verified
+	./scripts/backup-restore-test.sh
 
 outdated: ## Report outdated dependencies per brick
 	-docker compose run --rm --no-deps frontend npm outdated

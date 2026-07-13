@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Dump -> encrypt (public key only) -> ship. Any failing stage fails the
+# unit (pipefail), which systemd surfaces in the journal.
+set -euo pipefail
+set -a; . /opt/verbatim/backup.env; set +a
+stamp="$(date -u +%Y-%m-%dT%H%M%SZ)"
+docker exec verbatim-postgres-1 pg_dump -U verbatim -Fc verbatim \
+  | age -r "$AGE_PUBLIC_KEY" \
+  | docker run --rm -i \
+      -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY \
+      {{ aws_cli_image }} \
+      --endpoint-url https://s3.fr-par.scw.cloud --region fr-par \
+      s3 cp - "s3://$BACKUP_BUCKET/verbatim-$stamp.dump.age"

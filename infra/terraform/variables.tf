@@ -20,3 +20,8 @@ variable "hostinger_api_token" {
   type        = string
   sensitive   = true
 }
+
+variable "project_id" {
+  description = "Scaleway project ID (read from the scw CLI config at invocation)"
+  type        = string
+}

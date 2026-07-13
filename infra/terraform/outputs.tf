@@ -22,3 +22,14 @@ output "smtp_password" {
   value     = scaleway_iam_api_key.tem_sender.secret_key
   sensitive = true
 }
+
+# Backup job credentials: read them with `output -raw`, they land in the
+# prod secrets file (never the repo).
+output "backup_access_key" {
+  value = scaleway_iam_api_key.backup_writer.access_key
+}
+
+output "backup_secret_key" {
+  value     = scaleway_iam_api_key.backup_writer.secret_key
+  sensitive = true
+}

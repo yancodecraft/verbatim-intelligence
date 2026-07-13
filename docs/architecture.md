@@ -183,6 +183,13 @@ Le backend parle **SMTP** (MailKit) derrière une abstraction minimale
   l'hébergement, déclaré dans le Terraform existant, DNS (SPF/DKIM) posé
   par le même outillage que le reste.
 
+Le même principe vaut pour l'API LLM : **dev et e2e tournent sur un stub
+déterministe** (`PIPELINE_LLM=stub` dans le compose — le Mailpit du
+pipeline) qui respecte le contrat ids-seulement ; aucun test n'appelle
+l'API Anthropic. L'activation est explicite et opt-in : en production rien
+n'est posé, une clé manquante échoue bruyamment — jamais de repli
+silencieux vers des résultats factices.
+
 ## Ce qui n'est pas encore décidé
 
 - Les choix fins par brique (librairies Python, framework de tests front) —

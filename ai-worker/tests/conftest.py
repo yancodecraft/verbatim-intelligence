@@ -151,6 +151,23 @@ def fetch_analysis(
     return (row[0], row[1], row[2], row[3])
 
 
+def insert_verbatims(
+    connection: psycopg.Connection, analysis_id: uuid.UUID, texts: list[str]
+) -> list[uuid.UUID]:
+    """Insert the corpus rows as the backend would; returns ids in position order."""
+    ids = [uuid.uuid4() for _ in texts]
+    connection.cursor().executemany(
+        "INSERT INTO verbatims (id, analysis_id, position, text)"
+        " VALUES (%s, %s, %s, %s)",
+        [
+            (verbatim_id, analysis_id, position, text)
+            for position, (verbatim_id, text) in enumerate(zip(ids, texts, strict=True))
+        ],
+    )
+    connection.commit()
+    return ids
+
+
 def insert_theme(connection: psycopg.Connection, analysis_id: uuid.UUID) -> uuid.UUID:
     """Insert a theme as a dead worker's attempt would have left it."""
     theme_id = uuid.uuid4()

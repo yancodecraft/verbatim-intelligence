@@ -6,6 +6,51 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-13 — Le pipeline du spike devient le pipeline du produit
+
+Troisième brique de la tranche 4 : le worker analyse pour de vrai —
+découverte par batchs de 100, consolidation, synthèses avec ids
+représentatifs. Les prompts et les schémas sont **ceux du spike, repris
+tels quels** : sept runs les ont éprouvés, on industrialise ce qui a été
+validé, pas une variante.
+
+Ce qui change entre un spike et un produit :
+
+- **Le LLM est injectable** (un protocole `ask(prompt, schema)`) : les
+  tests du pipeline tournent contre un LLM scripté qui rejoue des réponses
+  canned — la CI ne dépend jamais de l'API Anthropic, ni d'une clé. Le test
+  central vérifie la fidélité de bout en bout : ids hors du lot droppés
+  (et comptés au log), ids représentatifs hors de leur thème droppés,
+  et le mapping index → UUID de verbatim fait **en un seul endroit**, à
+  l'écriture — le prompt ne voit jamais un id de base, la base ne reçoit
+  que des FK.
+- **Le plafond de coût est une garde, pas une intention** : les tokens
+  cumulés en base (toutes tentatives confondues) sont convertis en dollars
+  par la table de prix du code ; chaque appel vérifie avant de partir ;
+  dépassé, l'analyse échoue avec un message qui dit le plafond et la
+  dépense. Plafond par défaut 1 $ (`ANALYSIS_COST_CAP_USD`), modèle par
+  défaut `claude-opus-4-8` — celui du verdict du spike
+  (`ANTHROPIC_MODEL` pour changer). Un modèle sans prix connu refuse de
+  tourner : pas de plafond, pas d'appel.
+- **Heartbeat, progression et dépense avancent ensemble** : un seul UPDATE
+  entre chaque appel LLM. Le timeout API est borné (90 s, 1 retry) pour
+  rester loin sous les 5 minutes du reaper — un appel ne peut pas faire
+  passer un worker vivant pour mort.
+- **La langue est décidée par le code** (leçon du spike) : heuristique de
+  stopwords sur un échantillon du corpus, six langues, défaut anglais en
+  cas de doute — déterministe et testé, zéro dépendance.
+
+Le e2e a immédiatement rappelé une évidence : la stack dev n'a pas de clé
+API, et l'analyse du parcours complet échouait. La réponse suit la
+jurisprudence Mailpit — **un `StubLlm` déterministe pour dev et e2e**
+(`PIPELINE_LLM=stub` dans le compose), qui ne sélectionne que des ids
+réellement montrés dans le prompt. Opt-in explicite : pas de repli
+silencieux — en prod, une clé manquante doit échouer fort, pas produire
+des thèmes factices.
+
+30 tests worker au total. Reste à exposer les résultats côté API (brique
+suivante), puis la clé en prod.
+
 ## 2026-07-13 — Le worker devient increvable : heartbeat, reaper, idempotence
 
 Deuxième brique de la tranche 4, en TDD contre un vrai Postgres (17 tests

@@ -51,6 +51,9 @@ services:
       # Dev-only credentials, matching the postgres and redis services below.
       DATABASE_URL: "postgresql://verbatim:verbatim@postgres:5432/verbatim"
       REDIS_URL: "redis://:verbatim@redis:6379/0"
+      # Deterministic LLM stub — the Mailpit of the pipeline: dev and e2e
+      # never call the Anthropic API. Production sets a real key instead.
+      PIPELINE_LLM: "stub"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:

@@ -2,6 +2,8 @@ import logging
 import uuid
 from typing import TYPE_CHECKING
 
+from ai_worker import pipeline
+
 if TYPE_CHECKING:
     import psycopg
 
@@ -37,12 +39,8 @@ def process_analysis(connection: psycopg.Connection, analysis_id: str) -> bool:
 
 
 def run_pipeline(connection: psycopg.Connection, analysis_id: uuid.UUID) -> None:
-    """Run the LLM pipeline on a claimed analysis.
-
-    The real pipeline (batching, theme discovery, consolidation) lands with
-    the next brick of slice 4; the walking skeleton only signals it is alive.
-    """
-    beat(connection, analysis_id)
+    """Run the LLM pipeline on a claimed analysis (see ai_worker.pipeline)."""
+    pipeline.run(connection, analysis_id)
 
 
 def beat(connection: psycopg.Connection, analysis_id: uuid.UUID) -> None:

@@ -68,6 +68,20 @@ ai-worker/    Python ───────────────┘
   *produit* pas le texte cité. L'invariant « mot pour mot » devient ainsi
   vérifiable par un test, et une sortie LLM corrompue ne peut pas altérer
   une citation.
+- **Le regroupement se fait par découverte par batchs + consolidation**
+  (verdict du spike pipeline, consigné au [journal](../JOURNAL.md)) : chaque
+  batch de verbatims produit ses thèmes candidats avec les ids qui les
+  soutiennent, puis une passe de consolidation fusionne les doublons
+  inter-batchs ; enfin chaque thème reçoit sa synthèse et ses ids
+  représentatifs. L'alternative « taxonomie d'abord, classification
+  ensuite » est écartée : en classification de masse, le modèle rend par
+  batchs entiers des sorties vides mais conformes au schéma — un échec
+  structurel et silencieux. Deux règles en découlent : **les sorties LLM
+  structurées garantissent la forme, jamais l'exhaustivité** (chaque étape
+  vérifie programmatiquement ce qu'elle reçoit — ids valides, couverture,
+  noms connus — et rattrape ou compte ce qui manque) ; et **la langue des
+  synthèses est détectée par le code et injectée au prompt**, jamais
+  laissée à l'appréciation du modèle.
 - **Zero-data-retention côté API Anthropic.** Les verbatims contiennent des
   données personnelles de tiers ; leur traitement par le LLM se fait sans
   rétention ni entraînement. C'est un choix d'architecture, pas un réglage.

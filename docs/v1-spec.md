@@ -44,10 +44,16 @@ Un parcours unique, de bout en bout :
   plafonné par analyse, progression visible).
 - **Langue : UI en anglais.** Les synthèses sont produites dans la langue
   dominante du corpus, pour que citations et résumés restent dans la même
-  langue.
+  langue. Cette langue est **détectée par le système**, pas laissée à
+  l'appréciation du LLM (le spike a montré qu'il se trompe).
 - **Fidélité avant exhaustivité.** Un verbatim cité est toujours exact — par
   construction (référence à la ligne d'origine, jamais de texte régénéré) ;
   si un thème est incertain, on le dit plutôt que de lisser.
+- **Aucune perte silencieuse.** Le spike a montré que le LLM peut « oublier »
+  des pans entiers de corpus tout en rendant des réponses bien formées. La
+  V1 compte donc ce qu'elle traite : tout verbatim qu'aucune étape n'a pu
+  rattacher à l'analyse est comptabilisé et **visible dans les résultats**
+  (« N verbatims non classés »), jamais passé sous silence.
 - **Les verbatims sont des données personnelles de tiers.** Les retours
   clients contiennent presque toujours des données personnelles des clients
   de nos utilisateurs. Conséquences V1 : traitement via l'API Anthropic en

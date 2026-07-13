@@ -26,8 +26,11 @@ services:
       ConnectionStrings__Database: "Host=postgres;Database=verbatim;Username=verbatim;Password=${POSTGRES_PASSWORD}"
       ConnectionStrings__Redis: "redis:6379,password=${REDIS_PASSWORD}"
       # Magic links go out through Scaleway TEM (see infra/terraform/tem.tf).
+      # Port 2587, not 587: Scaleway instances drop outbound SMTP on the
+      # standard ports by default (anti-spam), and TEM provides 2587
+      # exactly for this — no need to weaken the security group.
       Email__SmtpHost: "smtp.tem.scaleway.com"
-      Email__SmtpPort: "587"
+      Email__SmtpPort: "2587"
       Email__UseStartTls: "true"
       Email__Username: ${SMTP_USERNAME}
       Email__Password: ${SMTP_PASSWORD}

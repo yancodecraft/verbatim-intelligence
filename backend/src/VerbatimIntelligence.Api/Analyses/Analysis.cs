@@ -21,5 +21,11 @@ public sealed class Analysis
 
     public AnalysisStatus Status { get; private set; } = AnalysisStatus.Pending;
 
+    /// <summary>Denormalized from the source upload, for the analyses list.</summary>
+    public string SourceFilename { get; init; } = "";
+
+    /// <summary>Number of verbatims extracted into this analysis.</summary>
+    public int VerbatimCount { get; init; }
+
     public required DateTimeOffset CreatedAt { get; init; }
 }

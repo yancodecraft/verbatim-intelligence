@@ -25,7 +25,11 @@ REDIS_IMAGE = (
 )
 
 # Provisional mirror of the EF Core migration (the schema owner), until the
-# cross-language contract test lands (see docs/architecture.md).
+# cross-language contract test lands (see docs/architecture.md). The worker
+# only reads and writes `analyses`; the ingestion tables (uploads, verbatims)
+# are omitted because it never touches them. source_filename and verbatim_count
+# carry their database defaults so the worker's minimal INSERT below stays
+# valid — the same expand/contract move as the backend migration.
 ANALYSES_DDL = """
 CREATE TABLE users (
     id uuid PRIMARY KEY,
@@ -36,6 +40,8 @@ CREATE TABLE analyses (
     id uuid PRIMARY KEY,
     user_id uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
     status varchar(16) NOT NULL,
+    source_filename varchar(255) NOT NULL DEFAULT '',
+    verbatim_count integer NOT NULL DEFAULT 0,
     created_at timestamptz NOT NULL,
     CONSTRAINT ck_analyses_status
         CHECK (status IN ('pending', 'running', 'succeeded', 'failed'))

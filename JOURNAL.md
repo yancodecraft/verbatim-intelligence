@@ -6,6 +6,25 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-13 — Tranche 3 ouverte : le schéma d'ingestion (uploads, verbatims)
+
+**Fait, en TDD :** le glossaire gagne le terme **Upload** (un CSV soumis et
+stocké tel quel, source des verbatims), puis deux tables arrivent —
+`uploads` (contenu `bytea`, colonnes détectées en `jsonb`, `row_count`,
+scopé au compte par le même *global query filter* que `analyses`) et
+`verbatims` (part de l'agrégat Analysis : `position` 0-based dans le fichier,
+`text` NOT NULL, cascade sur l'analyse). Les constraintes sont testées comme
+le contrat qu'elles sont (FK, cascade, round-trip jsonb) — pattern
+`AuthModelTests`.
+
+**Décision — dénormalisation compatible :** `source_filename` et
+`verbatim_count` sont ajoutés sur `analyses` en NOT NULL **avec défaut en
+base** (`''` et `0`). C'est l'étape *expand* d'expand/contract : les lignes
+existantes se remplissent seules, et le backend N-1 comme le worker (qui
+n'écrivent pas encore ces colonnes) continuent d'insérer. Le miroir DDL du
+worker reprend ces défauts ; les tables d'ingestion y sont volontairement
+absentes puisque le worker ne les touche pas.
+
 ## 2026-07-13 — Les backups Postgres : chiffrés, hors machine, restaurés en vrai
 
 **Le prérequis de la tranche 3 est rempli.** Chaque nuit, un timer systemd

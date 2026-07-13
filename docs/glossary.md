@@ -8,6 +8,12 @@ Les termes récurrents des documents du projet, dans leur sens précis ici.
   sondage, un avis, un extrait de ticket. L'unité de base du produit ; il
   n'est jamais reformulé, seulement regroupé et cité.
 - **Corpus** — l'ensemble des verbatims d'un même import (un fichier CSV).
+- **Upload** (`Upload` dans le code) — un fichier CSV soumis par un compte et
+  stocké tel quel, en attente d'analyse. Il porte ses colonnes détectées et
+  son nombre de lignes de données ; c'est la source depuis laquelle, une fois
+  la colonne verbatim désignée (voir *Mapping*), les verbatims sont extraits
+  pour constituer le *Corpus* d'une analyse. Un même upload peut fonder
+  plusieurs analyses.
 - **Thème (émergent)** — un regroupement de verbatims découvert dans le
   corpus lui-même, sans taxonomie prédéfinie, pondéré par son volume.
 - **Synthèse** — le résumé fidèle d'un thème, accompagné de verbatims

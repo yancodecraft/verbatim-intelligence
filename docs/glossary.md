@@ -14,8 +14,11 @@ Les termes récurrents des documents du projet, dans leur sens précis ici.
   la colonne verbatim désignée (voir *Mapping*), les verbatims sont extraits
   pour constituer le *Corpus* d'une analyse. Un même upload peut fonder
   plusieurs analyses.
-- **Thème (émergent)** — un regroupement de verbatims découvert dans le
-  corpus lui-même, sans taxonomie prédéfinie, pondéré par son volume.
+- **Thème (émergent)** (`Theme` dans le code) — un regroupement de verbatims
+  découvert dans le corpus lui-même, sans taxonomie prédéfinie, pondéré par
+  son volume. Chaque verbatim du thème lui est **rattaché** (`ThemeVerbatim`
+  dans le code) ; parmi les rattachés, quelques-uns sont **représentatifs**
+  (ordonnés par un rang) : ce sont eux que la synthèse cite.
 - **Synthèse** — le résumé fidèle d'un thème, accompagné de verbatims
   représentatifs cités mot pour mot. Un verbatim cité est une **référence à
   la ligne d'origine** (le LLM sélectionne des ids, il ne régénère jamais le

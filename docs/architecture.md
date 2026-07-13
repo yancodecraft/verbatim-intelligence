@@ -121,8 +121,9 @@ Postgres :
   crée analyse + verbatims, le worker les lit et écrit ses résultats, le
   backend les relit. C'est le test qui protège le contrat qu'aucun
   compilateur ne voit.
-- Le schéma sera documenté comme artefact (`docs/schema.md`) dès qu'il
-  existera — il joue le rôle qu'aurait un OpenAPI.
+- Le schéma est documenté comme artefact ([schema.md](schema.md)) — il joue
+  le rôle qu'aurait un OpenAPI : qui écrit quoi, et ce que chaque table
+  garantit. Il se met à jour dans le même commit que toute migration.
 
 ## Organisation du repo
 

@@ -28,4 +28,25 @@ public sealed class Analysis
     public int VerbatimCount { get; init; }
 
     public required DateTimeOffset CreatedAt { get; init; }
+
+    // The pipeline columns below are written by the worker through raw SQL
+    // (heartbeat, retries, progress, spend — see docs/architecture.md,
+    // "Résilience du traitement asynchrone"); the backend only reads them.
+
+    /// <summary>Last sign of life of the worker processing this analysis.</summary>
+    public DateTimeOffset? HeartbeatAt { get; init; }
+
+    /// <summary>Times a worker claimed this analysis; the reaper fails it past a limit.</summary>
+    public int Attempts { get; init; }
+
+    /// <summary>Why the analysis failed, when it did — shown to the user.</summary>
+    public string? Error { get; init; }
+
+    /// <summary>Verbatims already through theme discovery, for progress display.</summary>
+    public int ProcessedCount { get; init; }
+
+    /// <summary>LLM tokens consumed so far, backing the per-analysis cost cap.</summary>
+    public long InputTokens { get; init; }
+
+    public long OutputTokens { get; init; }
 }

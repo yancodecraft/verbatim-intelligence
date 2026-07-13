@@ -6,6 +6,43 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-13 — Tranche 4 ouverte : le schéma des thèmes, et docs/schema.md
+
+Le pipeline d'analyse commence par son contrat : les tables que le worker
+écrira et que le backend lira. Plan court validé par Yannick (cinq briques :
+schéma → résilience worker → pipeline LLM → contrat transverse → prod) ;
+cette entrée clôt la première.
+
+Deux tables nouvelles, dessinées pour porter l'invariant n°1 :
+
+- **`themes`** — nom, synthèse, `position` (l'ordre d'affichage est décidé
+  par le worker, pas recalculé côté lecture : déterministe, même en cas
+  d'égalité de poids).
+- **`theme_verbatims`** — le rattachement verbatim ↔ thème, PK composite.
+  Un seul champ de plus, `rank` : `NULL` = le verbatim soutient le thème,
+  `0..n` = il est **représentatif**, cité dans cet ordre par la synthèse.
+  Une citation est cette FK — aucun texte cité n'existe ailleurs que dans
+  `verbatims.text`. Le poids d'un thème n'est pas stocké : c'est le compte
+  de ses rattachés.
+
+Sur `analyses`, les colonnes de résilience et de pilotage arrivent en
+expand (defaults en base, un backend N-1 reste valide) : `heartbeat_at`,
+`attempts`, `error`, `processed_count`, et `input_tokens`/`output_tokens` —
+on stocke des **tokens**, pas un montant : les prix changent, la dépense
+mesurée reste vraie ; le plafond de coût se calcule dans le worker.
+
+Les tests de schéma vérifient ce que la **base** garantit, pas ce que EF
+veut bien laisser passer : le test anti-doublon insère en SQL brut, comme le
+worker le fera — la première version passait par le change tracker EF, qui
+levait l'erreur avant même que Postgres ne voie la ligne.
+
+Enfin, [docs/schema.md](docs/schema.md) naît : promis par architecture.md
+« dès que le schéma existera », c'est maintenant qu'il gagne sa place — le
+worker et le backend écrivent désormais les mêmes tables sans se voir, la
+carte de qui-écrit-quoi devient le document de travail des briques
+suivantes. Règle attachée : il se met à jour dans le même commit que toute
+migration.
+
 ## 2026-07-13 — La tranche 3 est close : l'ingestion CSV vit en production
 
 **Parcours exercé en réel sur https://verbatim.yantech.fr** : connexion par

@@ -25,6 +25,10 @@ public sealed class AppDbContext(
 
     public DbSet<Verbatim> Verbatims => Set<Verbatim>();
 
+    public DbSet<Theme> Themes => Set<Theme>();
+
+    public DbSet<ThemeVerbatim> ThemeVerbatims => Set<ThemeVerbatim>();
+
     public DbSet<Upload> Uploads => Set<Upload>();
 
     public DbSet<User> Users => Set<User>();
@@ -57,6 +61,13 @@ public sealed class AppDbContext(
             entity.Property(analysis => analysis.VerbatimCount)
                 .HasDefaultValue(0);
 
+            // Pipeline columns, worker-written; defaults keep the deployed N-1
+            // backend inserting valid rows through the migration (expand).
+            entity.Property(analysis => analysis.Attempts).HasDefaultValue(0);
+            entity.Property(analysis => analysis.ProcessedCount).HasDefaultValue(0);
+            entity.Property(analysis => analysis.InputTokens).HasDefaultValue(0L);
+            entity.Property(analysis => analysis.OutputTokens).HasDefaultValue(0L);
+
             entity.HasOne<User>().WithMany()
                 .HasForeignKey(analysis => analysis.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
@@ -73,6 +84,37 @@ public sealed class AppDbContext(
             // is only ever reached through its (already scoped) analysis.
             entity.HasOne<Analysis>().WithMany()
                 .HasForeignKey(verbatim => verbatim.AnalysisId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Theme>(entity =>
+        {
+            entity.ToTable("themes");
+            entity.Property(theme => theme.Name).HasMaxLength(200);
+
+            // Part of the Analysis aggregate: no independent query filter, it
+            // is only ever reached through its (already scoped) analysis.
+            entity.HasOne<Analysis>().WithMany()
+                .HasForeignKey(theme => theme.AnalysisId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ThemeVerbatim>(entity =>
+        {
+            entity.ToTable("theme_verbatims");
+
+            // The composite key doubles as the guard against attaching the
+            // same verbatim to a theme twice.
+            entity.HasKey(tv => new { tv.ThemeId, tv.VerbatimId });
+
+            entity.HasOne<Theme>().WithMany()
+                .HasForeignKey(tv => tv.ThemeId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // The fidelity invariant lives here: a citation must reference an
+            // existing verbatim row, the database refuses anything else.
+            entity.HasOne<Verbatim>().WithMany()
+                .HasForeignKey(tv => tv.VerbatimId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

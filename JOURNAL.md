@@ -6,6 +6,29 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-13 — Revue de la tranche 3 : « sound to push », deux suites données
+
+**La session autonome passe la revue par agent** : aucun trou de sécurité,
+pas d'IDOR, pas de XSS, pas d'explosion mémoire sur entrée hostile — la
+surface d'upload (bornée par Kestrel avant tout traitement, décodage UTF-8
+strict, sortie de boucle dès la 5 001ᵉ ligne), le scoping par filtres
+globaux et la migration expand/contract sont vérifiés tenir. La posture
+antiforgery (SameSite=Lax, même origine via proxy) est jugée légitime.
+
+Deux suites :
+- **Un test de plus, préventif** : rien ne pinnait « le texte exact de la
+  cellule, aucun trim » — l'invariant n°1 du projet — contre un futur bump
+  de CsvHelper qui changerait le défaut. Une cellule `"  padded  "` fait
+  maintenant le tour du parseur dans un test.
+- **`verbatimCount` tranché** : il compte les verbatims réellement
+  insérés (les cellules vides sont sautées) — comportement constaté et
+  accepté à la revue produit ; l'aperçu d'upload montre déjà le nombre de
+  lignes total.
+
+La revue produit (parcours réel en dev, deux CSV dont un corpus réel) est
+passée aussi. Reste, pour les quatre critères : pousser, déployer, exercer
+en production.
+
 ## 2026-07-13 — Session autonome — tranche 3 : l'ingestion CSV de bout en bout
 
 **Fait, en TDD sur le backend, brique par brique verte :** un CSV s'uploade,

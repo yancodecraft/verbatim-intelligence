@@ -57,6 +57,18 @@ public sealed class CsvContractTests
     }
 
     [Fact]
+    public void KeepsCellTextExact_IncludingSurroundingWhitespace()
+    {
+        // The project's #1 invariant (CLAUDE.md): a verbatim is the exact
+        // cell text, never trimmed or normalized. CsvHelper's default is
+        // TrimOptions.None today — this test pins that behavior against any
+        // future dependency bump silently starting to trim.
+        var parsed = ParseOk(Utf8("comment\n\"  padded, with spaces  \"\n"));
+
+        Assert.Equal("  padded, with spaces  ", parsed.Rows[0][0]);
+    }
+
+    [Fact]
     public void KeepsQuotedDelimitersInsideCells()
     {
         var parsed = ParseOk(Utf8("comment,score\n\"a, b, c\",5\n"));

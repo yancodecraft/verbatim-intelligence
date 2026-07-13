@@ -1,16 +1,29 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
+
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+
+using VerbatimIntelligence.Api.Analyses;
+using VerbatimIntelligence.Api.Data;
 
 namespace VerbatimIntelligence.Api.Tests;
 
 /// <summary>
-/// Analyses are account-scoped: no session means 401, and another account's
-/// analysis is a 404 — indistinguishable from a non-existent one.
+/// An analysis is created from an uploaded CSV and a chosen verbatim column,
+/// scoped to the account. It extracts the column into verbatims (empty cells
+/// skipped, file order kept) and enqueues the analysis for the worker.
 /// </summary>
 public class AnalysesEndpointsTests(ApiFactory factory) : IClassFixture<ApiFactory>
 {
+    private const string DefaultCsv = "comment,score\nGreat product,9\nToo slow,3\n";
+
     private sealed record AnalysisResponse(
         Guid Id, string Status, DateTimeOffset CreatedAt, string SourceFilename, int VerbatimCount);
+
+    private sealed record UploadResult(Guid Id, List<string> Columns);
 
     private async Task<HttpClient> SignedInClientAsync()
     {
@@ -20,10 +33,35 @@ public class AnalysesEndpointsTests(ApiFactory factory) : IClassFixture<ApiFacto
         return client;
     }
 
+    private static async Task<Guid> UploadAsync(HttpClient client, string csv, string filename = "feedback.csv")
+    {
+        var file = new ByteArrayContent(Encoding.UTF8.GetBytes(csv));
+        file.Headers.ContentType = new MediaTypeHeaderValue("text/csv");
+        var response = await client.PostAsync(
+            "/uploads", new MultipartFormDataContent { { file, "file", filename } });
+        response.EnsureSuccessStatusCode();
+        var body = await response.Content.ReadFromJsonAsync<UploadResult>();
+        Assert.NotNull(body);
+        return body.Id;
+    }
+
+    private static async Task<AnalysisResponse> CreateAnalysisAsync(
+        HttpClient client, string verbatimColumn = "comment", string csv = DefaultCsv)
+    {
+        var uploadId = await UploadAsync(client, csv);
+        var response = await client.PostAsJsonAsync(
+            "/analyses", new { uploadId, verbatimColumn });
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<AnalysisResponse>();
+        Assert.NotNull(body);
+        return body;
+    }
+
     [Fact]
     public async Task PostAnalyses_WithoutASession_Returns401()
     {
-        var response = await factory.CreateClient().PostAsync("/analyses", content: null);
+        var response = await factory.CreateClient().PostAsJsonAsync(
+            "/analyses", new { uploadId = Guid.NewGuid(), verbatimColumn = "comment" });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -37,27 +75,85 @@ public class AnalysesEndpointsTests(ApiFactory factory) : IClassFixture<ApiFacto
     }
 
     [Fact]
-    public async Task PostAnalyses_CreatesPendingAnalysis()
+    public async Task PostAnalyses_CreatesPendingAnalysisFromTheUpload()
     {
         var client = await SignedInClientAsync();
 
-        var response = await client.PostAsync("/analyses", content: null);
+        var analysis = await CreateAnalysisAsync(client);
 
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var analysis = await response.Content.ReadFromJsonAsync<AnalysisResponse>();
-        Assert.NotNull(analysis);
         Assert.NotEqual(Guid.Empty, analysis.Id);
         Assert.Equal("pending", analysis.Status);
-        Assert.Equal($"/analyses/{analysis.Id}", response.Headers.Location?.ToString());
+        Assert.Equal("feedback.csv", analysis.SourceFilename);
+        Assert.Equal(2, analysis.VerbatimCount);
     }
 
     [Fact]
-    public async Task GetAnalyses_ReturnsCreatedAnalysis()
+    public async Task PostAnalyses_WithUnknownUpload_Returns404()
     {
         var client = await SignedInClientAsync();
-        var created = await (await client.PostAsync("/analyses", content: null))
-            .Content.ReadFromJsonAsync<AnalysisResponse>();
-        Assert.NotNull(created);
+
+        var response = await client.PostAsJsonAsync(
+            "/analyses", new { uploadId = Guid.NewGuid(), verbatimColumn = "comment" });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PostAnalyses_WithAnotherAccountsUpload_Returns404()
+    {
+        var owner = await SignedInClientAsync();
+        var uploadId = await UploadAsync(owner, DefaultCsv);
+
+        var intruder = await SignedInClientAsync();
+        var response = await intruder.PostAsJsonAsync(
+            "/analyses", new { uploadId, verbatimColumn = "comment" });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PostAnalyses_WithAColumnThatDoesNotExist_Returns400()
+    {
+        var client = await SignedInClientAsync();
+        var uploadId = await UploadAsync(client, DefaultCsv);
+
+        var response = await client.PostAsJsonAsync(
+            "/analyses", new { uploadId, verbatimColumn = "nonexistent" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PostAnalyses_ExtractsColumnIntoVerbatims_SkippingEmptyCells()
+    {
+        var client = await SignedInClientAsync();
+
+        // Row at file position 1 has an empty comment: skipped, not counted.
+        var analysis = await CreateAnalysisAsync(
+            client, "comment", "comment,score\nfirst,1\n,2\nthird,3\n");
+
+        Assert.Equal(2, analysis.VerbatimCount);
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var verbatims = await db.Verbatims
+            .Where(verbatim => verbatim.AnalysisId == analysis.Id)
+            .OrderBy(verbatim => verbatim.Position)
+            .ToListAsync();
+
+        Assert.Equal(2, verbatims.Count);
+        Assert.Equal(0, verbatims[0].Position);
+        Assert.Equal("first", verbatims[0].Text);
+        // File order is preserved: the skipped empty leaves a gap at position 1.
+        Assert.Equal(2, verbatims[1].Position);
+        Assert.Equal("third", verbatims[1].Text);
+    }
+
+    [Fact]
+    public async Task GetAnalysis_ReturnsCreatedAnalysis()
+    {
+        var client = await SignedInClientAsync();
+        var created = await CreateAnalysisAsync(client);
 
         var response = await client.GetAsync($"/analyses/{created.Id}");
 
@@ -72,9 +168,7 @@ public class AnalysesEndpointsTests(ApiFactory factory) : IClassFixture<ApiFacto
     public async Task GetAnalysis_OfAnotherAccount_Returns404()
     {
         var owner = await SignedInClientAsync();
-        var created = await (await owner.PostAsync("/analyses", content: null))
-            .Content.ReadFromJsonAsync<AnalysisResponse>();
-        Assert.NotNull(created);
+        var created = await CreateAnalysisAsync(owner);
 
         var intruder = await SignedInClientAsync();
         var response = await intruder.GetAsync($"/analyses/{created.Id}");
@@ -87,9 +181,7 @@ public class AnalysesEndpointsTests(ApiFactory factory) : IClassFixture<ApiFacto
     {
         var client = await SignedInClientAsync();
 
-        var created = await (await client.PostAsync("/analyses", content: null))
-            .Content.ReadFromJsonAsync<AnalysisResponse>();
-        Assert.NotNull(created);
+        var created = await CreateAnalysisAsync(client);
 
         await using var redis = await StackExchange.Redis.ConnectionMultiplexer
             .ConnectAsync(factory.RedisConnectionString);
@@ -99,7 +191,7 @@ public class AnalysesEndpointsTests(ApiFactory factory) : IClassFixture<ApiFacto
     }
 
     [Fact]
-    public async Task GetAnalyses_ReturnsNotFoundForUnknownId()
+    public async Task GetAnalysis_ReturnsNotFoundForUnknownId()
     {
         var client = await SignedInClientAsync();
 
@@ -120,28 +212,22 @@ public class AnalysesEndpointsTests(ApiFactory factory) : IClassFixture<ApiFacto
     public async Task ListAnalyses_ReturnsTheAccountsAnalysesNewestFirst()
     {
         var client = await SignedInClientAsync();
-        var first = await (await client.PostAsync("/analyses", content: null))
-            .Content.ReadFromJsonAsync<AnalysisResponse>();
-        var second = await (await client.PostAsync("/analyses", content: null))
-            .Content.ReadFromJsonAsync<AnalysisResponse>();
-        Assert.NotNull(first);
-        Assert.NotNull(second);
+        var first = await CreateAnalysisAsync(client);
+        var second = await CreateAnalysisAsync(client);
 
         var list = await client.GetFromJsonAsync<List<AnalysisResponse>>("/analyses");
 
         Assert.NotNull(list);
         Assert.Equal(second.Id, list[0].Id);
         Assert.Equal(first.Id, list[1].Id);
-        Assert.Equal("pending", list[0].Status);
+        Assert.Equal("feedback.csv", list[0].SourceFilename);
     }
 
     [Fact]
     public async Task ListAnalyses_DoesNotListAnotherAccountsAnalyses()
     {
         var owner = await SignedInClientAsync();
-        var mine = await (await owner.PostAsync("/analyses", content: null))
-            .Content.ReadFromJsonAsync<AnalysisResponse>();
-        Assert.NotNull(mine);
+        var mine = await CreateAnalysisAsync(owner);
 
         var intruder = await SignedInClientAsync();
         var list = await intruder.GetFromJsonAsync<List<AnalysisResponse>>("/analyses");

@@ -17,7 +17,10 @@ COPY --from=build --chown=app:app /app /app
 USER app
 ENV PATH="/app/.venv/bin:$PATH"
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s \
+# Each probe boots a Python interpreter and opens a connection: generous
+# timeout and start period, or a busy VPS flunks a healthy worker during
+# deploys (seen in CI: two >5s probes at stack-recreate time, then green).
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s \
   CMD ["python", "-c", "import os, sys; from ai_worker.database import is_database_ready; sys.exit(0 if is_database_ready(os.environ['DATABASE_URL']) else 1)"]
 
 CMD ["ai-worker"]

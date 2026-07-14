@@ -35,10 +35,14 @@ def main() -> NoReturn:
     logger.info("ai-worker started, waiting for analyses")
     while True:
         # A dead loop in a live container is a silent failure: transient
-        # dependency errors are logged and retried, never fatal.
+        # dependency errors are logged and retried, never fatal. psycopg.Error
+        # covers the whole database side on purpose — on a fresh stack the
+        # first reap can hit a schema the backend has not migrated yet
+        # (UndefinedTable is a ProgrammingError, not an OperationalError),
+        # and each retry reconnects cleanly.
         try:
             _consume(client, database_url)
-        except psycopg.OperationalError, redis.exceptions.RedisError:
+        except psycopg.Error, redis.exceptions.RedisError:
             logger.exception(
                 "dependency unavailable, retrying in %ss", RETRY_DELAY_SECONDS
             )

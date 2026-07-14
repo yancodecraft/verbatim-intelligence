@@ -1,7 +1,7 @@
 # Dev-only image: source code comes from the compose bind mount, so this
 # image only carries the SDK and the restored NuGet packages. Rebuild it
 # whenever package references change (make rebuild).
-FROM mcr.microsoft.com/dotnet/sdk@sha256:940f919ae84dd92ccd4aab7686fa5b777870b006c9360351039e16bcaad73d89
+FROM mcr.microsoft.com/dotnet/sdk@sha256:ea8bde36c11b6e7eec2656d0e59101d4462f6bd630730f2c8201ed0572b295d5
 
 WORKDIR /app
 RUN chown app:app /app

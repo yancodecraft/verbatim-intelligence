@@ -3,7 +3,7 @@
 #   migrations : the self-contained EF Core migration bundle, run as a
 #                one-shot job before the api starts (compose: depends_on
 #                service_completed_successfully)
-FROM mcr.microsoft.com/dotnet/sdk@sha256:940f919ae84dd92ccd4aab7686fa5b777870b006c9360351039e16bcaad73d89 AS build
+FROM mcr.microsoft.com/dotnet/sdk@sha256:ea8bde36c11b6e7eec2656d0e59101d4462f6bd630730f2c8201ed0572b295d5 AS build
 
 WORKDIR /src
 COPY VerbatimIntelligence.slnx Directory.Build.props dotnet-tools.json ./

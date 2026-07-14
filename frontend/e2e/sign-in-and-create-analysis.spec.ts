@@ -33,12 +33,11 @@ async function readMailedToken(email: string): Promise<string> {
 	return token as string;
 }
 
-// The slice-3 journey on top of auth: an anonymous visitor is walled off, signs
-// in through a real e-mail round-trip, uploads a CSV, maps the verbatim column,
-// runs the analysis, and sees it cross the whole stack until it succeeds.
-test("sign in, upload a CSV, and run an analysis to succeeded", async ({
-	page,
-}) => {
+// The slices 3-5 journey on top of auth: an anonymous visitor is walled off,
+// signs in through a real e-mail round-trip, uploads a CSV, maps the verbatim
+// column, runs the analysis, sees it cross the whole stack until it succeeds,
+// and reads the results on the analysis screen.
+test("sign in, run an analysis, and read its results", async ({ page }) => {
 	const email = `e2e-${Date.now()}@example.test`;
 
 	// Anonymous: the home page redirects to sign-in.
@@ -76,21 +75,29 @@ test("sign in, upload a CSV, and run an analysis to succeeded", async ({
 		timeout: 15_000,
 	});
 
-	// The cross-brick contract, exercised for real: the backend wrote the
-	// corpus, the worker (stub LLM) wrote themes and citations by reference,
-	// the API reads them back — and a cited text is a fixture line, word for
-	// word, with its source position.
-	const analyses = await (await page.request.get("/api/analyses")).json();
-	const detail = await (
-		await page.request.get(`/api/analyses/${analyses[0].id}`)
-	).json();
-	expect(detail.processedCount).toBe(5);
-	expect(detail.themes.length).toBeGreaterThan(0);
-	const theme = detail.themes[0];
-	expect(theme.synthesis).not.toHaveLength(0);
-	expect(theme.representatives.length).toBeGreaterThan(0);
-	expect(theme.representatives[0].text).toBe("I love the new dashboard");
-	expect(theme.representatives[0].position).toBe(0);
+	// The cross-brick contract, exercised for real and read on-screen: the
+	// backend wrote the corpus, the worker (stub LLM) wrote themes and
+	// citations by reference, and the analysis screen shows them back.
+	await page.getByRole("link", { name: "feedback.csv" }).click();
+	await expect(page).toHaveURL(/\/analyses\/[0-9a-f-]{36}$/);
+	await expect(page.locator(".badge")).toHaveAttribute(
+		"data-status",
+		"succeeded",
+	);
+
+	// Themes weighted by volume, each with its synthesis.
+	const theme = page.locator(".theme").first();
+	await expect(theme).toBeVisible();
+	await expect(theme.locator(".synthesis")).not.toBeEmpty();
+	await expect(theme.locator(".count")).toContainText("verbatims");
+	await expect(theme.locator(".weight-bar")).toBeVisible();
+
+	// A cited text is a fixture line, word for word, with its source row.
+	const quote = theme
+		.locator("blockquote")
+		.filter({ hasText: "I love the new dashboard" });
+	await expect(quote).toBeVisible();
+	await expect(quote.locator("cite")).toHaveText("row 1");
 
 	// Sign out drops the session for real.
 	await page.getByRole("button", { name: "Sign out" }).click();

@@ -6,6 +6,31 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-14 — Effacement RGPD dans l'UI et mention à l'upload
+
+**Fait :** l'effacement devient utilisable, et l'information de traitement est
+donnée au bon endroit.
+
+- **Suppression d'analyse** : bouton sur l'écran de détail, avec confirmation
+  inline (pas de dialog JS) → `DELETE /api/analyses/{id}` → retour à l'accueil.
+- **Suppression de compte** : lien discret sur l'accueil (choix Yannick : pas
+  de page réglages en V1), même confirmation inline → `DELETE /api/auth/account`
+  → session oubliée, retour à l'écran de connexion.
+- **Mention à l'upload** : une phrase factuelle sous le formulaire — contenu
+  traité par un service tiers (Anthropic), fichier brut purgé après analyse.
+
+**Décisions :**
+
+- **Confirmation inline plutôt que `confirm()`.** Les dialogs natifs bloquent
+  et cassent l'automatisation ; un état à deux temps (révéler puis confirmer)
+  est plus sûr et testable.
+- **Périmètre RGPD volontairement borné ici.** La politique de confidentialité
+  complète et le DPA/ZDR Anthropic (contenu juridique et contractuel) restent à
+  Yannick — le code livre les mécanismes et l'information factuelle.
+
+Vérifié : 34 tests front (dont les deux suppressions), l'e2e supprime
+l'analyse et confirme sa disparition. Reste à déployer et exercer en prod.
+
 ## 2026-07-14 — Effacement RGPD backend : purge du CSV et suppression en cascade
 
 **Fait :** les bloquants RGPD B1 (droit à l'effacement) et B2 (CSV bruts

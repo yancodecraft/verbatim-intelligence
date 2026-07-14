@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from "vue";
-import { RouterLink } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
 import BackendStatus from "../components/BackendStatus.vue";
+import { useSession } from "../session";
 
 type AnalysisStatus = "pending" | "running" | "succeeded" | "failed";
 
@@ -15,10 +16,33 @@ interface Analysis {
 
 const POLL_INTERVAL_MS = 1500;
 
+const router = useRouter();
+const session = useSession();
+
 const analyses = ref<Analysis[]>([]);
 const loaded = ref(false);
 const failed = ref(false);
 let pollTimer: ReturnType<typeof setInterval> | undefined;
+
+const confirmingDeleteAccount = ref(false);
+const deletingAccount = ref(false);
+const deleteAccountFailed = ref(false);
+
+async function deleteAccount(): Promise<void> {
+	deletingAccount.value = true;
+	deleteAccountFailed.value = false;
+	try {
+		const response = await fetch("/api/auth/account", { method: "DELETE" });
+		if (!response.ok) {
+			throw new Error(`unexpected status ${response.status}`);
+		}
+		session.clear();
+		await router.push({ name: "sign-in" });
+	} catch {
+		deleteAccountFailed.value = true;
+		deletingAccount.value = false;
+	}
+}
 
 async function load(): Promise<void> {
 	try {
@@ -86,6 +110,36 @@ onUnmounted(stopPolling);
 				</li>
 			</ul>
 		</section>
+
+		<section class="account">
+			<button
+				v-if="!confirmingDeleteAccount"
+				type="button"
+				class="link-button"
+				@click="confirmingDeleteAccount = true"
+			>
+				Delete my account
+			</button>
+			<template v-else>
+				<span>
+					Delete your account and all your analyses and uploads? This cannot be
+					undone.
+				</span>
+				<button type="button" :disabled="deletingAccount" @click="deleteAccount">
+					Confirm deletion
+				</button>
+				<button
+					type="button"
+					:disabled="deletingAccount"
+					@click="confirmingDeleteAccount = false"
+				>
+					Cancel
+				</button>
+			</template>
+			<p v-if="deleteAccountFailed" class="error">
+				Something went wrong deleting your account.
+			</p>
+		</section>
 	</main>
 </template>
 
@@ -123,5 +177,28 @@ onUnmounted(stopPolling);
 	text-transform: uppercase;
 	font-size: 0.75rem;
 	letter-spacing: 0.05em;
+}
+
+.account {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+	margin-top: 3rem;
+	font-size: 0.85rem;
+}
+
+.link-button {
+	background: none;
+	border: none;
+	padding: 0;
+	color: #b00020;
+	text-decoration: underline;
+	cursor: pointer;
+	font-size: inherit;
+}
+
+.error {
+	color: #b00020;
 }
 </style>

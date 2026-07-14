@@ -103,6 +103,12 @@ async function runAnalysis(): Promise<void> {
 			/>
 		</p>
 
+		<p class="notice">
+			Your verbatims are processed by a third-party AI service (Anthropic) to
+			group them into themes. Only upload feedback you are allowed to share,
+			and the raw file is discarded once the analysis is created.
+		</p>
+
 		<p v-if="error" class="error">{{ error }}</p>
 
 		<section v-if="preview" class="preview">
@@ -173,5 +179,11 @@ fieldset {
 
 .error {
 	color: #b00020;
+}
+
+.notice {
+	font-size: 0.85rem;
+	opacity: 0.7;
+	max-width: 40rem;
 }
 </style>

@@ -188,6 +188,13 @@ l'état, garder le basic-auth d'edge.
   - **B1 corrigé côté backend** : `DELETE /analyses/{id}` (scopé compte, cascade
     DB vers verbatims/thèmes/share) et `DELETE /auth/account` (cascade vers
     analyses, uploads, tokens, sessions ; cookie de session effacé). Testés.
-  - Restent : l'**exposition UI** de ces suppressions + la **mention à l'upload**
-    et la page privacy (B3), le **DPA/ZDR Anthropic** et le registre de
-    sous-traitance (démarches non-code).
+  - Restent : la page privacy complète, le **DPA/ZDR Anthropic** et le registre
+    de sous-traitance (démarches non-code).
+- **2026-07-14 — effacement RGPD (frontend) et mention à l'upload.**
+  - **B1 exposé dans l'UI** : bouton « Delete analysis » (confirmation inline)
+    sur le détail d'analyse, et lien « Delete my account » sur l'accueil. Le
+    parcours e2e supprime désormais l'analyse et vérifie sa disparition.
+  - **B3 partiellement traité** : mention factuelle sous le formulaire d'upload
+    (contenu traité par un service tiers, Anthropic ; fichier brut purgé après
+    analyse). La **politique de confidentialité complète** et le **DPA** restent
+    à faire (démarches non-code).

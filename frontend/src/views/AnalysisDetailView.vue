@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from "vue";
-import { RouterLink, useRoute } from "vue-router";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 import AnalysisResults from "../components/AnalysisResults.vue";
 import type { Theme } from "../types/analysis";
 
@@ -22,11 +22,33 @@ interface AnalysisDetail {
 const POLL_INTERVAL_MS = 1500;
 
 const route = useRoute();
+const router = useRouter();
 const analysis = ref<AnalysisDetail | null>(null);
 const loaded = ref(false);
 const failed = ref(false);
 const notFound = ref(false);
 let pollTimer: ReturnType<typeof setInterval> | undefined;
+
+const confirmingDelete = ref(false);
+const deleting = ref(false);
+const deleteFailed = ref(false);
+
+async function deleteAnalysis(): Promise<void> {
+	deleting.value = true;
+	deleteFailed.value = false;
+	try {
+		const response = await fetch(`/api/analyses/${route.params.id}`, {
+			method: "DELETE",
+		});
+		if (!response.ok) {
+			throw new Error(`unexpected status ${response.status}`);
+		}
+		await router.push({ name: "home" });
+	} catch {
+		deleteFailed.value = true;
+		deleting.value = false;
+	}
+}
 
 // The raw share URL is only ever known right after creating it — the
 // backend stores a hash. After a reload the screen only knows `shared`.
@@ -223,6 +245,34 @@ onUnmounted(stopPolling);
 					:unclassified-count="analysis.unclassifiedCount"
 				/>
 			</template>
+
+			<section class="danger">
+				<button
+					v-if="!confirmingDelete"
+					type="button"
+					class="danger-button"
+					@click="confirmingDelete = true"
+				>
+					Delete analysis
+				</button>
+				<template v-else>
+					<span>Delete this analysis permanently?</span>
+					<button
+						type="button"
+						class="danger-button"
+						:disabled="deleting"
+						@click="deleteAnalysis"
+					>
+						Confirm deletion
+					</button>
+					<button type="button" :disabled="deleting" @click="confirmingDelete = false">
+						Cancel
+					</button>
+				</template>
+				<p v-if="deleteFailed" class="error">
+					Something went wrong deleting this analysis.
+				</p>
+			</section>
 		</section>
 	</main>
 </template>
@@ -278,5 +328,19 @@ onUnmounted(stopPolling);
 .share-actions {
 	display: flex;
 	gap: 0.5rem;
+}
+
+.danger {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+	margin-top: 2rem;
+	padding-top: 1rem;
+	border-top: 1px solid var(--color-border);
+}
+
+.danger-button {
+	color: #b00020;
 }
 </style>

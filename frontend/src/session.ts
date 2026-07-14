@@ -20,8 +20,14 @@ async function signOut(): Promise<void> {
 	email.value = null;
 }
 
+// Forget the session locally, without a network call: used after the account
+// itself is deleted (the server-side session is already gone).
+function clear(): void {
+	email.value = null;
+}
+
 export function useSession() {
-	return { email, checked, check, signOut };
+	return { email, checked, check, signOut, clear };
 }
 
 /** Test hook only: module-level state leaks between specs otherwise. */

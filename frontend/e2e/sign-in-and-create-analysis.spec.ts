@@ -139,6 +139,13 @@ test("sign in, run an analysis, read and share its results", async ({
 	).toBeVisible();
 	await anonymousContext.close();
 
+	// Right to erasure: deleting the analysis (after an inline confirm) removes
+	// it from the account for real (docs/security-review.md, B1).
+	await page.getByRole("button", { name: "Delete analysis" }).click();
+	await page.getByRole("button", { name: "Confirm deletion" }).click();
+	await expect(page).toHaveURL(/\/$/);
+	await expect(page.getByText("No analyses yet")).toBeVisible();
+
 	// Sign out drops the session for real.
 	await page.getByRole("button", { name: "Sign out" }).click();
 	await expect(page).toHaveURL(/\/sign-in$/);

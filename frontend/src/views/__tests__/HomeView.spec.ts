@@ -2,12 +2,15 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import HomeView from "../HomeView.vue";
 
+const { pushMock } = vi.hoisted(() => ({ pushMock: vi.fn() }));
+
 vi.mock("vue-router", () => ({
 	// Renders the target so tests can assert where a link points.
 	RouterLink: {
 		props: ["to"],
 		template: '<a :data-to="JSON.stringify(to)"><slot /></a>',
 	},
+	useRouter: () => ({ push: pushMock }),
 }));
 
 interface AnalysisPayload {
@@ -57,6 +60,42 @@ describe("HomeView", () => {
 	afterEach(() => {
 		vi.useRealTimers();
 		vi.unstubAllGlobals();
+		pushMock.mockReset();
+	});
+
+	it("deletes the account after confirmation and returns to sign-in", async () => {
+		const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+			if (url === "/api/health") {
+				return Promise.resolve({ ok: true } as Response);
+			}
+			if (url === "/api/auth/account" && init?.method === "DELETE") {
+				return Promise.resolve({ ok: true } as Response);
+			}
+			return Promise.resolve({
+				ok: true,
+				json: () => Promise.resolve([]),
+			} as Response);
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		const wrapper = mount(HomeView);
+		await flushPromises();
+
+		// First click reveals the confirm step; nothing is deleted yet.
+		await wrapper.get(".link-button").trigger("click");
+		expect(fetchMock).not.toHaveBeenCalledWith("/api/auth/account", {
+			method: "DELETE",
+		});
+
+		const confirm = wrapper
+			.findAll("button")
+			.find((button) => button.text() === "Confirm deletion");
+		await confirm?.trigger("click");
+		await flushPromises();
+
+		expect(fetchMock).toHaveBeenCalledWith("/api/auth/account", {
+			method: "DELETE",
+		});
+		expect(pushMock).toHaveBeenCalledWith({ name: "sign-in" });
 	});
 
 	it("shows an empty state and a link to create an analysis", async () => {

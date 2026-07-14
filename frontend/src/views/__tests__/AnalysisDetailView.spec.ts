@@ -5,9 +5,12 @@ import AnalysisDetailView from "../AnalysisDetailView.vue";
 
 const ANALYSIS_ID = "0198b1c2-0000-7000-8000-000000000001";
 
+const { pushMock } = vi.hoisted(() => ({ pushMock: vi.fn() }));
+
 vi.mock("vue-router", () => ({
 	RouterLink: { template: "<a><slot /></a>" },
 	useRoute: () => ({ params: { id: ANALYSIS_ID } }),
+	useRouter: () => ({ push: pushMock }),
 }));
 
 interface DetailPayload {
@@ -89,6 +92,40 @@ describe("AnalysisDetailView", () => {
 	afterEach(() => {
 		vi.useRealTimers();
 		vi.unstubAllGlobals();
+		pushMock.mockReset();
+	});
+
+	it("deletes the analysis after confirmation and returns home", async () => {
+		const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+			if (url === `/api/analyses/${ANALYSIS_ID}` && init?.method === "DELETE") {
+				return Promise.resolve({ ok: true, status: 204 } as Response);
+			}
+			return Promise.resolve({
+				ok: true,
+				status: 200,
+				json: () => Promise.resolve(detail({})),
+			} as Response);
+		});
+		vi.stubGlobal("fetch", fetchMock);
+		const wrapper = mount(AnalysisDetailView);
+		await flushPromises();
+
+		// First click reveals the confirm step; nothing is deleted yet.
+		await wrapper.get(".danger-button").trigger("click");
+		expect(fetchMock).not.toHaveBeenCalledWith(`/api/analyses/${ANALYSIS_ID}`, {
+			method: "DELETE",
+		});
+
+		const confirm = wrapper
+			.findAll("button")
+			.find((button) => button.text() === "Confirm deletion");
+		await confirm?.trigger("click");
+		await flushPromises();
+
+		expect(fetchMock).toHaveBeenCalledWith(`/api/analyses/${ANALYSIS_ID}`, {
+			method: "DELETE",
+		});
+		expect(pushMock).toHaveBeenCalledWith({ name: "home" });
 	});
 
 	it("shows a loading state until the first response arrives", async () => {

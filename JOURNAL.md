@@ -6,6 +6,29 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-14 — La tranche 4 est close : le produit analyse pour de vrai
+
+Les quatre critères de « fini » sont remplis : **tests en CI** (60 backend,
+32 worker, 15 front, le e2e qui exerce le contrat inter-briques),
+**revue par agent** (deux findings, tous deux traités — dont le fencing
+par numéro de tentative), **parcours exercé réellement** (747 verbatims
+State of CSS analysés en production : 12 thèmes, 58 citations vérifiées
+mot pour mot contre le fichier source, 0 violation, 0,48 $), **en
+production** (le fencing déployé compris).
+
+Le déploiement du fencing a d'ailleurs rappelé une leçon d'opérations :
+le healthcheck du worker (un interpréteur Python + une connexion à chaque
+sonde) dépassait ses 5 s de timeout pendant la recréation de la stack sur
+le VPS — `compose --wait` a recalé un conteneur qui devenait sain dix
+secondes plus tard. Seuils desserrés (60 s de start period, 10 s de
+timeout), redéployé, vert.
+
+Le cœur du produit existe : on uploade un CSV, et il en sort des thèmes
+pondérés et des synthèses qui citent les clients mot pour mot — par
+construction, pas par promesse. Prochaine tranche : la **restitution**,
+l'écran qui rend tout cela visible ; l'API expose déjà tout ce qu'il lui
+faut (thèmes, synthèses, citations, progression, erreur).
+
 ## 2026-07-14 — Revue de la tranche 4 : le zombie et le token de fencing
 
 La revue par agent sur l'ensemble de la tranche (7 commits) valide le

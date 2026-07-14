@@ -29,6 +29,8 @@ public sealed class AppDbContext(
 
     public DbSet<ThemeVerbatim> ThemeVerbatims => Set<ThemeVerbatim>();
 
+    public DbSet<ShareToken> ShareTokens => Set<ShareToken>();
+
     public DbSet<Upload> Uploads => Set<Upload>();
 
     public DbSet<User> Users => Set<User>();
@@ -115,6 +117,23 @@ public sealed class AppDbContext(
             // existing verbatim row, the database refuses anything else.
             entity.HasOne<Verbatim>().WithMany()
                 .HasForeignKey(tv => tv.VerbatimId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ShareToken>(entity =>
+        {
+            entity.ToTable("share_tokens");
+            entity.Property(token => token.TokenHash).HasMaxLength(64);
+            entity.HasIndex(token => token.TokenHash).IsUnique();
+
+            // One active link per analysis, enforced by the schema.
+            entity.HasIndex(token => token.AnalysisId).IsUnique();
+
+            // No independent query filter: the owner reaches it through the
+            // (already scoped) analysis, the public endpoint by token hash —
+            // the token itself is the access capability.
+            entity.HasOne<Analysis>().WithMany()
+                .HasForeignKey(token => token.AnalysisId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

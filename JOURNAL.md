@@ -6,6 +6,43 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-14 — Security review d'ouverture menée
+
+**Fait :** la security review qui conditionne l'ouverture publique — les dix
+points de la checklist de [practices.md](docs/practices.md). Cinq audits de
+code en lecture seule (backend, frontend, worker, infra Ansible/Terraform,
+Caddy) croisés avec des vérifications sur la prod en direct (headers, endpoints
+publics, ports exposés). Rapport complet et priorisé dans
+[docs/security-review.md](docs/security-review.md).
+
+**Verdict :** le socle applicatif est solide — aucun IDOR (double verrou
+`RequireAccount` + query filters EF vérifié endpoint par endpoint), tokens de
+partage irréprochables et testés, XSS fermé par construction, parsing CSV borné,
+datastores injoignables de l'extérieur (5432/6379 filtrés en prod), backups
+chiffrés avec restauration exercée, zéro secret dans l'historique git. Les
+faiblesses ne sont pas dans le code livré mais dans ce qui manque avant
+d'ouvrir.
+
+**Ce qui reste à faire, dans l'ordre :**
+1. **RGPD** — le vrai chantier, et un prérequis auto-imposé : rien n'est
+   supprimable (schéma en cascade prêt, endpoint absent), les CSV bruts vivent à
+   vie sans lien avec l'analyse, aucune mention légale/info LLM, DPA + registre
+   de sous-traitance non faits, ZDR Anthropic affirmé mais non matérialisé.
+2. **Retrait du basic-auth = un seul commit** posant simultanément les headers
+   de sécurité globaux + HSTS, le rate limiting réel par IP (`UseForwardedHeaders`
+   — son absence rend le rate limit `/shared` global, donc DoS trivial déjà
+   actif) et une limite sur upload/analyse.
+3. **Rôle Postgres non-superuser** avant toute ouverture réelle.
+4. **Procédures d'exploitation** : escrow de la clé de backup `age`, alerte sur
+   échec de backup, rotations Anthropic/Postgres documentées.
+
+**Décision :** l'ouverture reste conditionnée à la levée des bloquants RGPD et
+au commit de retrait du basic-auth ; le basic-auth d'edge reste en place d'ici
+là. La review ne clôt pas une tranche — elle ouvre la liste de travail
+post-V1.
+
+---
+
 ## 2026-07-14 — La tranche 6 est close : la V1 est complète
 
 Dernière tranche de la roadmap. Le rapport partageable est livré : un

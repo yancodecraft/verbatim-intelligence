@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 
 using Microsoft.EntityFrameworkCore;
 
@@ -40,6 +41,23 @@ builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
 builder.Services.AddScoped<CurrentAccountAccessor>();
 builder.Services.AddHealthChecks().AddDbContextCheck<AppDbContext>();
 
+// Anti-abuse on the public shared-report endpoint (practices.md). A single
+// global window, not per-IP: behind the reverse proxy the app only sees the
+// proxy's address, so an IP partition would be global in disguise anyway.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy(ShareEndpoints.RateLimitPolicy, _ =>
+        RateLimitPartition.GetFixedWindowLimiter("shared-report", _ =>
+            new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = builder.Configuration
+                    .GetValue<int?>("RateLimiting:SharedPermitLimit") ?? 60,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+            }));
+});
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -56,10 +74,12 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 
 // No UseHttpsRedirection: TLS terminates at the reverse proxy; the app only
 // ever serves plain HTTP inside the compose network.
+app.UseRateLimiter();
 app.MapHealthChecks("/health");
 app.MapAuth();
 app.MapUploads();
 app.MapAnalyses();
+app.MapShares();
 
 await app.RunAsync();
 

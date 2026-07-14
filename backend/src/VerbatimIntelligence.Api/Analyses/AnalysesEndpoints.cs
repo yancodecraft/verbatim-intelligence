@@ -109,8 +109,10 @@ public static class AnalysesEndpoints
                 db, analysis.Id, cancellationToken);
             var unclassifiedCount = await AnalysisReadModel.UnclassifiedCountAsync(
                 db, analysis.Id, cancellationToken);
+            var shared = await db.ShareTokens.AnyAsync(
+                token => token.AnalysisId == analysis.Id, cancellationToken);
 
-            return Results.Ok(AnalysisDetailResponse.From(analysis, unclassifiedCount, themes));
+            return Results.Ok(AnalysisDetailResponse.From(analysis, unclassifiedCount, shared, themes));
         });
 
         return routes;
@@ -179,10 +181,14 @@ public sealed record AnalysisDetailResponse(
     int ProcessedCount,
     string? Error,
     int UnclassifiedCount,
+    bool Shared,
     IReadOnlyList<ThemeResponse> Themes)
 {
     public static AnalysisDetailResponse From(
-        Analysis analysis, int unclassifiedCount, IReadOnlyList<ThemeResponse> themes) =>
+        Analysis analysis,
+        int unclassifiedCount,
+        bool shared,
+        IReadOnlyList<ThemeResponse> themes) =>
         new(
             analysis.Id,
             analysis.Status,
@@ -192,5 +198,6 @@ public sealed record AnalysisDetailResponse(
             analysis.ProcessedCount,
             analysis.Error,
             unclassifiedCount,
+            shared,
             themes);
 }

@@ -55,17 +55,20 @@
     wait: true
     wait_timeout: 180
 
-# The Caddyfile is a read-only bind mount: converging the stack does not
-# restart Caddy when only that file changed, so the running process would
-# keep serving the previous configuration. Reloading unconditionally is a
-# graceful no-op when nothing changed, and — unlike a reload gated on the
-# template task — it also repairs a host whose file was updated by an
-# earlier run that failed before reloading.
-- name: Reload Caddy against the installed configuration
-  community.docker.docker_compose_v2_exec:
+# The Caddyfile is a single-file bind mount and Ansible replaces it
+# atomically (write + rename): the file on the host gets a NEW inode while
+# the running container — and even a restarted one — stays attached to the
+# old inode, so `caddy reload` rereads the stale content. Only recreating
+# the container remounts the bind onto the installed file.
+- name: Recreate Caddy so it mounts the installed configuration
+  community.docker.docker_compose_v2:
     project_src: /opt/verbatim
-    service: caddy
-    command: caddy reload --config /etc/caddy/Caddyfile
+    services:
+      - caddy
+    state: present
+    recreate: always
+    wait: true
+    wait_timeout: 60
 
 # Post-deploy smoke tests, from the controller through the public edge:
 # a deploy that does not serve real traffic has not happened.

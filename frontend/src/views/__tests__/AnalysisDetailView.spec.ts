@@ -128,22 +128,26 @@ describe("AnalysisDetailView", () => {
 
 		const themes = wrapper.findAll(".theme");
 		expect(themes).toHaveLength(2);
-		expect(themes[0].text()).toContain("Performance");
-		expect(themes[0].text()).toContain("Speed disappoints.");
-		expect(themes[0].text()).toContain("8 verbatims");
+		const [performance, praise] = themes;
+		if (!performance || !praise) {
+			throw new Error("expected two rendered themes");
+		}
+		expect(performance.text()).toContain("Performance");
+		expect(performance.text()).toContain("Speed disappoints.");
+		expect(performance.text()).toContain("8 verbatims");
 		// The citation is the original row, word for word, with its 1-based row.
-		const quote = themes[0].get("blockquote");
+		const quote = performance.get("blockquote");
 		expect(quote.text()).toContain("Too slow");
 		expect(quote.text()).toContain("row 2");
 		// Weight bars are proportional to the largest theme.
-		expect(themes[0].get(".weight-bar").attributes("style")).toContain(
+		expect(performance.get(".weight-bar").attributes("style")).toContain(
 			"width: 100%",
 		);
-		expect(themes[1].get(".weight-bar").attributes("style")).toContain(
+		expect(praise.get(".weight-bar").attributes("style")).toContain(
 			"width: 25%",
 		);
 		// A theme without representatives renders no quote — and no crash.
-		expect(themes[1].findAll("blockquote")).toHaveLength(0);
+		expect(praise.findAll("blockquote")).toHaveLength(0);
 		// Every verbatim classified: no loss notice.
 		expect(wrapper.text()).not.toContain("could not be classified");
 	});

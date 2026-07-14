@@ -6,6 +6,54 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-14 — La tranche 5 est close : les résultats se lisent à l'écran
+
+Les quatre critères de « fini » sont remplis : **tests en CI** (63 backend,
+24 front, l'e2e qui suit désormais le parcours jusqu'à l'écran d'analyse),
+**revue par agent** (un finding traité, voir plus bas), **parcours exercé
+réellement** (92 verbatims accessibility_features uploadés en production,
+progression suivie en direct sur l'écran, 4 thèmes, 33 non-classés
+affichés, citations vérifiées mot pour mot contre le fichier source — sur
+l'analyse des 747 aussi, retours à la ligne compris), **en production**.
+
+La tranche était annoncée « quasi exclusivement frontend » ; elle a
+commencé par un trou backend. La spec exige « N verbatims non classés »
+visible, et ce compte **ne peut pas se dériver côté front** : un verbatim
+peut être rattaché à plusieurs thèmes, donc `verbatimCount − Σ poids des
+thèmes` est faux (négatif, même, sur nos corpus réels). L'API expose
+désormais `unclassifiedCount` — le compte des verbatims sans aucun
+rattachement, calculé à la lecture, jamais stocké, comme le poids des
+thèmes. Le glossaire gagne « Non classé ». Sur l'analyse des 747 : 125
+non classés, affichés — c'est exactement la perte que « aucune perte
+silencieuse » interdit de taire.
+
+Décisions et enseignements :
+
+1. **Polling, pas de SSE.** L'écran de détail reprend le polling 1,5 s de
+   la liste tant que l'analyse n'est pas terminale. architecture.md
+   classait le mécanisme en détail d'implémentation ; une requête toutes
+   les 1,5 s sur un seul écran ouvert ne justifie pas un canal serveur.
+   L'ordre des thèmes vient de l'API (le worker trie par volume avant
+   d'assigner les positions) — le front n'a aucun tri à faire.
+2. **La revue par agent** a trouvé un vrai bug : `loaded` écrit mais
+   jamais lu — entre le montage et la première réponse, aucune branche du
+   template ne matchait, écran vide. Ni Biome ni vue-tsc ne pouvaient le
+   voir (règles unused désactivées sur les .vue). Corrigé par un état de
+   chargement visible. Son observation sur l'ordre des citations (un
+   `OrderBy` avant `Join` peut se perdre à la traduction SQL dans de
+   vieilles versions d'EF) est verrouillée par un test qui insère les
+   rangs dans le désordre.
+3. **Leçon CI : `make lint` ne type-checke pas le front.** Biome ne lit
+   pas les types ; seul le build d'image (`npm run build` → `vue-tsc`)
+   applique `noUncheckedIndexedAccess`. Le job build-push a cassé sur la
+   spec du nouvel écran, le deploy a été sauté, corrigé dans la foulée.
+   Un `make ci` local vert n'avait rien vu de plus — le type-check du
+   front mériterait d'entrer dans `make lint`, noté pour plus tard.
+
+L'écran ferme la boucle promise par le pitch : uploader des retours
+bruts, revenir, lire des thèmes pondérés et des clients cités mot pour
+mot. Reste la tranche 6 — le rapport partageable, la dernière de la V1.
+
 ## 2026-07-14 — La tranche 4 est close : le produit analyse pour de vrai
 
 Les quatre critères de « fini » sont remplis : **tests en CI** (60 backend,

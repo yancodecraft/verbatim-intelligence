@@ -104,34 +104,11 @@ public static class AnalysesEndpoints
             }
 
             // Themes and citations are read through the (already scoped)
-            // analysis; a cited text is the original verbatim row resolved
-            // by its foreign key — never a stored copy.
-            var themes = await db.Themes
-                .Where(theme => theme.AnalysisId == analysis.Id)
-                .OrderBy(theme => theme.Position)
-                .Select(theme => new ThemeResponse(
-                    theme.Name,
-                    theme.Synthesis,
-                    db.ThemeVerbatims.Count(tv => tv.ThemeId == theme.Id),
-                    db.ThemeVerbatims
-                        .Where(tv => tv.ThemeId == theme.Id && tv.Rank != null)
-                        .OrderBy(tv => tv.Rank)
-                        .Join(
-                            db.Verbatims,
-                            tv => tv.VerbatimId,
-                            verbatim => verbatim.Id,
-                            (tv, verbatim) => new RepresentativeResponse(
-                                verbatim.Position, verbatim.Text))
-                        .ToList()))
-                .ToListAsync(cancellationToken);
-
-            // No silent loss: verbatims no step attached to any theme are
-            // counted, never inferred from the per-theme counts (a verbatim
-            // may support several themes). Always computed, never stored.
-            var unclassifiedCount = await db.Verbatims
-                .Where(verbatim => verbatim.AnalysisId == analysis.Id
-                    && !db.ThemeVerbatims.Any(tv => tv.VerbatimId == verbatim.Id))
-                .CountAsync(cancellationToken);
+            // analysis, via the projection shared with the public report.
+            var themes = await AnalysisReadModel.ThemesAsync(
+                db, analysis.Id, cancellationToken);
+            var unclassifiedCount = await AnalysisReadModel.UnclassifiedCountAsync(
+                db, analysis.Id, cancellationToken);
 
             return Results.Ok(AnalysisDetailResponse.From(analysis, unclassifiedCount, themes));
         });

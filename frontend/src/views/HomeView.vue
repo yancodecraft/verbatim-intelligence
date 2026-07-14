@@ -75,7 +75,12 @@ onUnmounted(stopPolling);
 			</p>
 			<ul v-else class="analysis-list">
 				<li v-for="analysis in analyses" :key="analysis.id">
-					<span class="filename">{{ analysis.sourceFilename }}</span>
+					<RouterLink
+						class="filename"
+						:to="{ name: 'analysis-detail', params: { id: analysis.id } }"
+					>
+						{{ analysis.sourceFilename }}
+					</RouterLink>
 					<span class="count">{{ analysis.verbatimCount }} verbatims</span>
 					<span class="badge" :data-status="analysis.status">{{ analysis.status }}</span>
 				</li>

@@ -3,7 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import HomeView from "../HomeView.vue";
 
 vi.mock("vue-router", () => ({
-	RouterLink: { template: "<a><slot /></a>" },
+	// Renders the target so tests can assert where a link points.
+	RouterLink: {
+		props: ["to"],
+		template: '<a :data-to="JSON.stringify(to)"><slot /></a>',
+	},
 }));
 
 interface AnalysisPayload {
@@ -72,6 +76,18 @@ describe("HomeView", () => {
 		expect(wrapper.text()).toContain("feedback.csv");
 		expect(wrapper.text()).toContain("42 verbatims");
 		expect(wrapper.get(".badge").attributes("data-status")).toBe("pending");
+	});
+
+	it("links each analysis to its detail screen", async () => {
+		stubFetch([[analysis("succeeded")]]);
+		const wrapper = mount(HomeView);
+		await flushPromises();
+
+		const link = wrapper.get(".analysis-list a");
+		expect(JSON.parse(link.attributes("data-to") ?? "{}")).toEqual({
+			name: "analysis-detail",
+			params: { id: "0198b1c2-0000-7000-8000-000000000001" },
+		});
 	});
 
 	it("polls until the analysis reaches a terminal status, then stops", async () => {

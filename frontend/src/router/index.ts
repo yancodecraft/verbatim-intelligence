@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { useSession } from "../session";
+import AnalysisDetailView from "../views/AnalysisDetailView.vue";
 import HomeView from "../views/HomeView.vue";
 import NewAnalysisView from "../views/NewAnalysisView.vue";
 import SignInView from "../views/SignInView.vue";
@@ -18,6 +19,12 @@ const router = createRouter({
 			path: "/analyses/new",
 			name: "new-analysis",
 			component: NewAnalysisView,
+			meta: { requiresAuth: true },
+		},
+		{
+			path: "/analyses/:id",
+			name: "analysis-detail",
+			component: AnalysisDetailView,
 			meta: { requiresAuth: true },
 		},
 		{

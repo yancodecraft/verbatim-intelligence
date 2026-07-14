@@ -1,20 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
 import { RouterLink, useRoute } from "vue-router";
+import AnalysisResults from "../components/AnalysisResults.vue";
+import type { Theme } from "../types/analysis";
 
 type AnalysisStatus = "pending" | "running" | "succeeded" | "failed";
-
-interface Representative {
-	position: number;
-	text: string;
-}
-
-interface Theme {
-	name: string;
-	synthesis: string;
-	verbatimCount: number;
-	representatives: Representative[];
-}
 
 interface AnalysisDetail {
 	id: string;
@@ -25,6 +15,7 @@ interface AnalysisDetail {
 	processedCount: number;
 	error: string | null;
 	unclassifiedCount: number;
+	shared: boolean;
 	themes: Theme[];
 }
 
@@ -36,20 +27,6 @@ const loaded = ref(false);
 const failed = ref(false);
 const notFound = ref(false);
 let pollTimer: ReturnType<typeof setInterval> | undefined;
-
-// The worker orders themes by volume before assigning positions and the API
-// returns them in position order: the received order IS the volume order.
-// Weight bars are relative to the largest theme, not the corpus total — a
-// verbatim may support several themes, so theme counts don't sum to it.
-const maxThemeCount = computed(() =>
-	Math.max(1, ...(analysis.value?.themes.map((t) => t.verbatimCount) ?? [])),
-);
-
-const unclassifiedNotice = computed(() => {
-	const count = analysis.value?.unclassifiedCount ?? 0;
-	const noun = count === 1 ? "verbatim" : "verbatims";
-	return `${count} ${noun} could not be classified into any theme.`;
-});
 
 async function load(): Promise<void> {
 	try {
@@ -136,39 +113,11 @@ onUnmounted(stopPolling);
 				{{ analysis.error }}
 			</p>
 
-			<template v-else>
-				<p v-if="analysis.themes.length === 0">
-					No themes were found in this corpus.
-				</p>
-				<p v-if="analysis.unclassifiedCount > 0" class="unclassified">
-					{{ unclassifiedNotice }}
-				</p>
-				<article
-					v-for="(theme, index) in analysis.themes"
-					:key="index"
-					class="theme"
-				>
-					<header class="theme-header">
-						<h3>{{ theme.name }}</h3>
-						<span class="count">{{ theme.verbatimCount }} verbatims</span>
-					</header>
-					<div class="weight-track">
-						<div
-							class="weight-bar"
-							:style="{ width: `${(theme.verbatimCount / maxThemeCount) * 100}%` }"
-						/>
-					</div>
-					<p class="synthesis">{{ theme.synthesis }}</p>
-					<blockquote
-						v-for="representative in theme.representatives"
-						:key="representative.position"
-					>
-						<p>{{ representative.text }}</p>
-						<!-- Positions are 0-based source rows; people count from 1. -->
-						<cite>row {{ representative.position + 1 }}</cite>
-					</blockquote>
-				</article>
-			</template>
+			<AnalysisResults
+				v-else
+				:themes="analysis.themes"
+				:unclassified-count="analysis.unclassifiedCount"
+			/>
 		</section>
 	</main>
 </template>
@@ -199,67 +148,5 @@ onUnmounted(stopPolling);
 .error {
 	color: #b00020;
 	overflow-wrap: anywhere;
-}
-
-.unclassified {
-	padding: 0.5rem 0.75rem;
-	background: var(--color-background-mute);
-	border: 1px solid var(--color-border);
-	border-radius: 4px;
-}
-
-.theme {
-	padding: 1rem 0;
-	border-bottom: 1px solid rgba(128, 128, 128, 0.2);
-}
-
-.theme-header {
-	display: flex;
-	align-items: baseline;
-	justify-content: space-between;
-	gap: 1rem;
-}
-
-.theme-header h3 {
-	overflow-wrap: anywhere;
-}
-
-.count {
-	opacity: 0.7;
-	white-space: nowrap;
-}
-
-.weight-track {
-	height: 6px;
-	margin: 0.5rem 0;
-	background: var(--color-background-mute);
-	border-radius: 3px;
-	overflow: hidden;
-}
-
-.weight-bar {
-	height: 100%;
-	background: hsla(160, 100%, 37%, 1);
-	border-radius: 3px;
-}
-
-.synthesis {
-	overflow-wrap: anywhere;
-}
-
-.theme blockquote {
-	margin: 0.75rem 0 0;
-	padding: 0.25rem 0 0.25rem 0.75rem;
-	border-left: 3px solid var(--color-border-hover);
-}
-
-.theme blockquote p {
-	overflow-wrap: anywhere;
-}
-
-.theme cite {
-	display: block;
-	font-size: 0.8rem;
-	opacity: 0.7;
 }
 </style>

@@ -1,5 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Theme } from "../../types/analysis";
 import AnalysisDetailView from "../AnalysisDetailView.vue";
 
 const ANALYSIS_ID = "0198b1c2-0000-7000-8000-000000000001";
@@ -8,18 +9,6 @@ vi.mock("vue-router", () => ({
 	RouterLink: { template: "<a><slot /></a>" },
 	useRoute: () => ({ params: { id: ANALYSIS_ID } }),
 }));
-
-interface RepresentativePayload {
-	position: number;
-	text: string;
-}
-
-interface ThemePayload {
-	name: string;
-	synthesis: string;
-	verbatimCount: number;
-	representatives: RepresentativePayload[];
-}
 
 interface DetailPayload {
 	id: string;
@@ -30,7 +19,8 @@ interface DetailPayload {
 	processedCount: number;
 	error: string | null;
 	unclassifiedCount: number;
-	themes: ThemePayload[];
+	shared: boolean;
+	themes: Theme[];
 }
 
 function detail(overrides: Partial<DetailPayload>): DetailPayload {
@@ -43,6 +33,7 @@ function detail(overrides: Partial<DetailPayload>): DetailPayload {
 		processedCount: 10,
 		error: null,
 		unclassifiedCount: 0,
+		shared: false,
 		themes: [],
 		...overrides,
 	};
@@ -104,55 +95,7 @@ describe("AnalysisDetailView", () => {
 		expect(fetchMock.mock.calls.length).toBe(callsAfterTerminal);
 	});
 
-	it("renders themes in the order received, with weight, synthesis and exact citations", async () => {
-		stubFetch([
-			detail({
-				themes: [
-					{
-						name: "Performance",
-						synthesis: "Speed disappoints.",
-						verbatimCount: 8,
-						representatives: [{ position: 1, text: "Too slow" }],
-					},
-					{
-						name: "Praise",
-						synthesis: "People are happy.",
-						verbatimCount: 2,
-						representatives: [],
-					},
-				],
-			}),
-		]);
-		const wrapper = mount(AnalysisDetailView);
-		await flushPromises();
-
-		const themes = wrapper.findAll(".theme");
-		expect(themes).toHaveLength(2);
-		const [performance, praise] = themes;
-		if (!performance || !praise) {
-			throw new Error("expected two rendered themes");
-		}
-		expect(performance.text()).toContain("Performance");
-		expect(performance.text()).toContain("Speed disappoints.");
-		expect(performance.text()).toContain("8 verbatims");
-		// The citation is the original row, word for word, with its 1-based row.
-		const quote = performance.get("blockquote");
-		expect(quote.text()).toContain("Too slow");
-		expect(quote.text()).toContain("row 2");
-		// Weight bars are proportional to the largest theme.
-		expect(performance.get(".weight-bar").attributes("style")).toContain(
-			"width: 100%",
-		);
-		expect(praise.get(".weight-bar").attributes("style")).toContain(
-			"width: 25%",
-		);
-		// A theme without representatives renders no quote — and no crash.
-		expect(praise.findAll("blockquote")).toHaveLength(0);
-		// Every verbatim classified: no loss notice.
-		expect(wrapper.text()).not.toContain("could not be classified");
-	});
-
-	it("reports unclassified verbatims when there are any", async () => {
+	it("renders the results once succeeded", async () => {
 		stubFetch([
 			detail({
 				unclassifiedCount: 3,
@@ -160,8 +103,8 @@ describe("AnalysisDetailView", () => {
 					{
 						name: "Performance",
 						synthesis: "Speed disappoints.",
-						verbatimCount: 7,
-						representatives: [],
+						verbatimCount: 8,
+						representatives: [{ position: 1, text: "Too slow" }],
 					},
 				],
 			}),
@@ -169,17 +112,12 @@ describe("AnalysisDetailView", () => {
 		const wrapper = mount(AnalysisDetailView);
 		await flushPromises();
 
+		// The rendering itself is covered by AnalysisResults.spec.ts; here we
+		// only assert the view hands the payload over.
+		expect(wrapper.get(".theme").text()).toContain("Performance");
 		expect(wrapper.text()).toContain(
 			"3 verbatims could not be classified into any theme.",
 		);
-	});
-
-	it("shows a dedicated message when the analysis succeeded without themes", async () => {
-		stubFetch([detail({ themes: [] })]);
-		const wrapper = mount(AnalysisDetailView);
-		await flushPromises();
-
-		expect(wrapper.text()).toContain("No themes were found in this corpus.");
 	});
 
 	it("shows the error of a failed analysis and does not poll again", async () => {
@@ -209,28 +147,5 @@ describe("AnalysisDetailView", () => {
 		await flushPromises();
 
 		expect(wrapper.text()).toContain("This analysis was not found.");
-	});
-
-	it("escapes verbatim content instead of rendering it as HTML", async () => {
-		// Sentinel against any future v-html: user content must stay text.
-		const hostile = '<img src=x onerror="alert(1)">';
-		stubFetch([
-			detail({
-				themes: [
-					{
-						name: hostile,
-						synthesis: hostile,
-						verbatimCount: 1,
-						representatives: [{ position: 0, text: hostile }],
-					},
-				],
-			}),
-		]);
-		const wrapper = mount(AnalysisDetailView);
-		await flushPromises();
-
-		expect(wrapper.find("img").exists()).toBe(false);
-		expect(wrapper.html()).toContain("&lt;img");
-		expect(wrapper.text()).toContain(hostile);
 	});
 });

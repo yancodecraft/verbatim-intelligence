@@ -40,7 +40,6 @@
     src: Caddyfile.j2
     dest: /opt/verbatim/Caddyfile
     mode: "0644"
-  register: caddyfile
 
 - name: Install the environment file (secrets)
   ansible.builtin.template:
@@ -58,13 +57,15 @@
 
 # The Caddyfile is a read-only bind mount: converging the stack does not
 # restart Caddy when only that file changed, so the running process would
-# keep serving the previous configuration.
-- name: Reload Caddy when its configuration changed
+# keep serving the previous configuration. Reloading unconditionally is a
+# graceful no-op when nothing changed, and — unlike a reload gated on the
+# template task — it also repairs a host whose file was updated by an
+# earlier run that failed before reloading.
+- name: Reload Caddy against the installed configuration
   community.docker.docker_compose_v2_exec:
     project_src: /opt/verbatim
     service: caddy
     command: caddy reload --config /etc/caddy/Caddyfile
-  when: caddyfile is changed
 
 # Post-deploy smoke tests, from the controller through the public edge:
 # a deploy that does not serve real traffic has not happened.

@@ -3,6 +3,7 @@ import { useSession } from "../session";
 import AnalysisDetailView from "../views/AnalysisDetailView.vue";
 import HomeView from "../views/HomeView.vue";
 import NewAnalysisView from "../views/NewAnalysisView.vue";
+import SharedReportView from "../views/SharedReportView.vue";
 import SignInView from "../views/SignInView.vue";
 import VerifyView from "../views/VerifyView.vue";
 
@@ -37,6 +38,13 @@ const router = createRouter({
 			path: "/verify",
 			name: "verify",
 			component: VerifyView,
+		},
+		{
+			// Public by design: the token in the URL is the access capability,
+			// no session is ever checked (the guard skips routes without meta).
+			path: "/shared/:token",
+			name: "shared-report",
+			component: SharedReportView,
 		},
 	],
 });

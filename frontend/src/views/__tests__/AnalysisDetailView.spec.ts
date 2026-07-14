@@ -54,6 +54,33 @@ function stubFetch(responses: DetailPayload[]): ReturnType<typeof vi.fn> {
 	return fetchMock;
 }
 
+// Routes the detail poll and the share endpoints separately so the share
+// interactions can be exercised on top of a loaded analysis.
+function stubFetchWithShare(
+	detailPayload: DetailPayload,
+): ReturnType<typeof vi.fn> {
+	const fetchMock = vi.fn((url: string, init?: RequestInit) => {
+		if (url.endsWith("/share")) {
+			if (init?.method === "POST") {
+				return Promise.resolve({
+					ok: true,
+					status: 200,
+					json: () =>
+						Promise.resolve({ url: "https://app.example/shared/tok123" }),
+				} as Response);
+			}
+			return Promise.resolve({ ok: true, status: 204 } as Response);
+		}
+		return Promise.resolve({
+			ok: true,
+			status: 200,
+			json: () => Promise.resolve(detailPayload),
+		} as Response);
+	});
+	vi.stubGlobal("fetch", fetchMock);
+	return fetchMock;
+}
+
 describe("AnalysisDetailView", () => {
 	beforeEach(() => {
 		vi.useFakeTimers();
@@ -136,6 +163,50 @@ describe("AnalysisDetailView", () => {
 		const callsAfterTerminal = fetchMock.mock.calls.length;
 		await vi.advanceTimersByTimeAsync(4500);
 		expect(fetchMock.mock.calls.length).toBe(callsAfterTerminal);
+	});
+
+	it("creates a share link and shows the URL to copy", async () => {
+		stubFetchWithShare(detail({}));
+		const wrapper = mount(AnalysisDetailView);
+		await flushPromises();
+
+		await wrapper.get(".share-actions button").trigger("click");
+		await flushPromises();
+
+		const input = wrapper.find<HTMLInputElement>(".share-link input");
+		expect(input.exists()).toBe(true);
+		expect(input.element.value).toBe("https://app.example/shared/tok123");
+		expect(wrapper.text()).toContain("Anyone with this link can read");
+	});
+
+	it("offers regenerate and revoke when already shared, and revokes", async () => {
+		stubFetchWithShare(detail({ shared: true }));
+		const wrapper = mount(AnalysisDetailView);
+		await flushPromises();
+
+		// After a reload the raw URL is gone — only regenerate/revoke remain.
+		expect(wrapper.text()).toContain("This analysis is shared.");
+		const buttons = wrapper.findAll(".share-actions button");
+		expect(buttons.map((b) => b.text())).toEqual(["Regenerate link", "Revoke"]);
+
+		const [, revoke] = buttons;
+		if (!revoke) {
+			throw new Error("expected a revoke button");
+		}
+		await revoke.trigger("click");
+		await flushPromises();
+
+		expect(wrapper.get(".share-actions button").text()).toBe(
+			"Create share link",
+		);
+	});
+
+	it("hides the share section while the analysis is not succeeded", async () => {
+		stubFetch([detail({ status: "running", processedCount: 3 })]);
+		const wrapper = mount(AnalysisDetailView);
+		await flushPromises();
+
+		expect(wrapper.find(".share").exists()).toBe(false);
 	});
 
 	it("shows a not-found message on 404", async () => {

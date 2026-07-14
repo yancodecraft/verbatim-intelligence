@@ -28,6 +28,66 @@ const failed = ref(false);
 const notFound = ref(false);
 let pollTimer: ReturnType<typeof setInterval> | undefined;
 
+// The raw share URL is only ever known right after creating it — the
+// backend stores a hash. After a reload the screen only knows `shared`.
+const shareUrl = ref<string | null>(null);
+const shareBusy = ref(false);
+const shareFailed = ref(false);
+const copied = ref(false);
+
+async function createShareLink(): Promise<void> {
+	shareBusy.value = true;
+	shareFailed.value = false;
+	copied.value = false;
+	try {
+		const response = await fetch(`/api/analyses/${route.params.id}/share`, {
+			method: "POST",
+		});
+		if (!response.ok) {
+			throw new Error(`unexpected status ${response.status}`);
+		}
+		const body = await response.json();
+		shareUrl.value = body.url;
+		if (analysis.value) {
+			analysis.value.shared = true;
+		}
+	} catch {
+		shareFailed.value = true;
+	} finally {
+		shareBusy.value = false;
+	}
+}
+
+async function revokeShareLink(): Promise<void> {
+	shareBusy.value = true;
+	shareFailed.value = false;
+	try {
+		const response = await fetch(`/api/analyses/${route.params.id}/share`, {
+			method: "DELETE",
+		});
+		if (!response.ok) {
+			throw new Error(`unexpected status ${response.status}`);
+		}
+		shareUrl.value = null;
+		copied.value = false;
+		if (analysis.value) {
+			analysis.value.shared = false;
+		}
+	} catch {
+		shareFailed.value = true;
+	} finally {
+		shareBusy.value = false;
+	}
+}
+
+async function copyShareLink(): Promise<void> {
+	if (shareUrl.value === null) {
+		return;
+	}
+	await navigator.clipboard.writeText(shareUrl.value);
+	copied.value = true;
+}
+
 async function load(): Promise<void> {
 	try {
 		const response = await fetch(`/api/analyses/${route.params.id}`);
@@ -113,11 +173,56 @@ onUnmounted(stopPolling);
 				{{ analysis.error }}
 			</p>
 
-			<AnalysisResults
-				v-else
-				:themes="analysis.themes"
-				:unclassified-count="analysis.unclassifiedCount"
-			/>
+			<template v-else>
+				<section class="share">
+					<template v-if="shareUrl !== null">
+						<p>
+							Anyone with this link can read the report — until you revoke it.
+						</p>
+						<div class="share-link">
+							<input type="text" readonly :value="shareUrl" />
+							<button type="button" :disabled="shareBusy" @click="copyShareLink">
+								{{ copied ? "Copied" : "Copy" }}
+							</button>
+						</div>
+					</template>
+					<p v-else-if="analysis.shared">
+						This analysis is shared. The link is only shown when created —
+						regenerate to get a new one (the old link stops working).
+					</p>
+					<div class="share-actions">
+						<button
+							v-if="!analysis.shared"
+							type="button"
+							:disabled="shareBusy"
+							@click="createShareLink"
+						>
+							Create share link
+						</button>
+						<template v-else>
+							<button
+								v-if="shareUrl === null"
+								type="button"
+								:disabled="shareBusy"
+								@click="createShareLink"
+							>
+								Regenerate link
+							</button>
+							<button type="button" :disabled="shareBusy" @click="revokeShareLink">
+								Revoke
+							</button>
+						</template>
+					</div>
+					<p v-if="shareFailed" class="error">
+						Something went wrong updating the share link.
+					</p>
+				</section>
+
+				<AnalysisResults
+					:themes="analysis.themes"
+					:unclassified-count="analysis.unclassifiedCount"
+				/>
+			</template>
 		</section>
 	</main>
 </template>
@@ -148,5 +253,30 @@ onUnmounted(stopPolling);
 .error {
 	color: #b00020;
 	overflow-wrap: anywhere;
+}
+
+.share {
+	margin: 1rem 0;
+	padding: 0.75rem;
+	background: var(--color-background-soft);
+	border: 1px solid var(--color-border);
+	border-radius: 4px;
+}
+
+.share-link {
+	display: flex;
+	gap: 0.5rem;
+	margin: 0.5rem 0;
+}
+
+.share-link input {
+	flex: 1;
+	font-family: monospace;
+	padding: 0.25rem 0.5rem;
+}
+
+.share-actions {
+	display: flex;
+	gap: 0.5rem;
 }
 </style>

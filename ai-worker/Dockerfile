@@ -1,7 +1,7 @@
 # Production image: the synced virtualenv is built with uv, then copied
 # onto the matching slim Python base (the uv python3.14 variants are built
 # from the same docker-library python image, so the venv symlinks resolve).
-FROM ghcr.io/astral-sh/uv@sha256:7cf77f594be8042dab6daa9fe326f90962252268b4f120a7f5dccce4d947e6c1 AS build
+FROM ghcr.io/astral-sh/uv@sha256:0f36cb9361a3346885ca3677e3767016687b5a170c1a6b88465ec14aefec90aa AS build
 
 WORKDIR /app
 ENV UV_LINK_MODE=copy UV_COMPILE_BYTECODE=1

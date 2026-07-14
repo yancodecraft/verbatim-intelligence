@@ -1,7 +1,7 @@
 # Dev-only image: source code comes from the compose bind mount, so this
 # image only carries uv, Python and the synced virtualenv. Rebuild it
 # whenever dependencies change (make rebuild).
-FROM ghcr.io/astral-sh/uv@sha256:7cf77f594be8042dab6daa9fe326f90962252268b4f120a7f5dccce4d947e6c1
+FROM ghcr.io/astral-sh/uv@sha256:0f36cb9361a3346885ca3677e3767016687b5a170c1a6b88465ec14aefec90aa
 
 WORKDIR /app
 RUN groupadd --system app && useradd --system --gid app --create-home app \

@@ -23,14 +23,14 @@ Ce qu'on sait déjà : ce sera une **app SaaS, sur le web**.
 2. ~~**Définir comment on va le faire**~~ — fait : architecture et stack dans
    [docs/architecture.md](docs/architecture.md), découpage en tranches dans
    [docs/roadmap.md](docs/roadmap.md).
-3. **Construire, tranche par tranche** — voir la roadmap. ← on en est là
-   (tranches 1 à 5 finies : squelette, auth par magic link, ingestion
-   CSV, pipeline d'analyse et restitution en production sur
-   https://verbatim.yantech.fr — l'écran d'analyse montre la progression
-   en direct puis thèmes pondérés, synthèses, citations exactes et
-   verbatims non classés ; backups Postgres chiffrés avec restauration
-   testée ; à suivre : tranche 6, le rapport partageable — la dernière
-   de la V1).
+3. **Construire, tranche par tranche** — fait : les six tranches sont
+   finies et la **V1 est complète** en production sur
+   https://verbatim.yantech.fr (squelette, auth par magic link,
+   ingestion CSV, pipeline d'analyse, restitution, rapport partageable
+   par lien révocable — public hors basic-auth ; backups Postgres
+   chiffrés avec restauration testée). ← on en est là. La suite : la
+   security review d'ouverture ([practices.md](docs/practices.md)) et
+   ce que l'usage réel apprendra.
 
 Une tranche n'est « finie » que testée, exercée réellement, et déployée.
 

@@ -6,6 +6,72 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-14 — La tranche 6 est close : la V1 est complète
+
+Dernière tranche de la roadmap. Le rapport partageable est livré : un
+lien public en lecture seule vers une analyse, porté par un `ShareToken`
+— 256 bits de CSPRNG en base64url dans l'URL, seul son SHA-256 en base,
+révocable en supprimant la ligne. Les quatre critères de « fini » sont
+remplis : **tests en CI** (86 backend dont 19 sur le partage, 32 front,
+l'e2e qui partage, lit en anonyme et révoque), **revue par agent** (un
+finding, reproduit puis corrigé — voir plus bas), **parcours exercé
+réellement en production** (lien créé sur une analyse réelle, lu en
+navigation privée sans basic-auth, headers vérifiés, révoqué, re-visite
+en « not available »), **en production**.
+
+Décisions actées :
+
+1. **Un seul lien actif par analyse**, garanti par le schéma (index
+   unique sur `analysis_id`). Le raw n'étant montrable qu'à la création
+   (la base ne garde qu'un hash), créer remplace : régénérer révoque
+   l'ancien lien par construction. Pas d'expiration — la spec ne demande
+   que « révocable », la révocation est le mécanisme.
+2. **Le rapport public est du contenu, rien d'autre** : le DTO expose
+   nom de fichier, date, comptes et thèmes — ni id interne, ni statut,
+   ni erreur. Token inconnu et token révoqué sont le même 404 nu.
+3. **Rate limit global** (fenêtre fixe, 60/min, configurable) sur
+   l'endpoint public, volontairement pas par IP : derrière Caddy le
+   backend ne voit que l'adresse du proxy — une partition par IP serait
+   globale déguisée. Suite possible si besoin : ForwardedHeaders +
+   partition réelle.
+4. **`/shared/*` et `/api/shared/*` sortent du basic-auth d'edge**
+   (décision Yannick) : un lien de partage est public par conception,
+   tout le reste de l'app reste protégé jusqu'à la security review
+   d'ouverture. Les mêmes chemins portent noindex, Referrer-Policy
+   no-referrer (le token ne fuit pas par les liens sortants) et une CSP
+   stricte — posés par Caddy et doublés en `<meta>` par la page.
+5. Caddy n'a pas d'access logs (défaut v2) : si on les active un jour,
+   masquer les chemins `/shared/*` — l'URL contient le token.
+
+Le déploiement a encore enseigné une leçon d'exploitation, attrapée
+parce qu'on vérifie en vrai : le premier deploy a installé le nouveau
+Caddyfile **sans l'activer**. Le fichier est un bind mount mono-fichier
+et Ansible le remplace atomiquement (write + rename) : l'hôte obtient un
+**nouvel inode**, le conteneur reste attaché à l'ancien — `caddy reload`
+relit le contenu périmé, et un restart n'y changerait rien. Deux faux
+départs (reload conditionné, puis inconditionnel) avant le bon fix :
+**recréer le conteneur Caddy à chaque deploy**, et un smoke test qui
+échoue si un token inconnu renvoie le 401 de l'edge au lieu du 404 nu de
+l'API. C'est ce smoke test qui a refusé les deux premiers deploys — le
+pipeline qui se défend, exactement le rôle qu'on lui a donné.
+
+**La revue par agent** a validé le socle (token, anti-IDOR, DTO, CSP,
+v-html absent, rate limit, révocation e2e) et trouvé une vraie course :
+deux créations concurrentes du lien passaient toutes deux le delete et
+entraient en collision sur l'index unique — un 500 brut pour l'un des
+appelants. Reproduite par un test (4 POST parallèles), corrigée en
+sérialisant le remplacement sur le verrou de la ligne d'analyse. La
+revue note aussi, pour plus tard : si une suppression d'analyse/compte
+apparaît (RGPD), revisiter le endpoint public (`SingleAsync` après le
+lookup du token).
+
+La V1 décrite dans la spec est entière : ingérer des verbatims, les
+regrouper en thèmes émergents, en lire des synthèses qui citent les
+clients mot pour mot, suivre la progression, et diffuser le résultat
+par un lien révocable. La suite n'est plus une tranche — c'est la
+security review d'ouverture (practices.md) et ce que l'usage réel
+apprendra.
+
 ## 2026-07-14 — La tranche 5 est close : les résultats se lisent à l'écran
 
 Les quatre critères de « fini » sont remplis : **tests en CI** (63 backend,

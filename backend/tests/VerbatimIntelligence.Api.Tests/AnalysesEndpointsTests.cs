@@ -431,18 +431,122 @@ public class AnalysesEndpointsTests(ApiFactory factory) : IClassFixture<ApiFacto
         var client = limited.CreateClient();
         await SignInFlow.SignInAsync(
             client, factory.MailpitApiBaseAddress, $"{Guid.NewGuid():N}@example.test");
-        var uploadId = await UploadAsync(client, DefaultCsv);
 
-        for (var attempt = 0; attempt < 2; attempt++)
+        // A fresh upload per analysis: creating one purges its source CSV, so
+        // an upload is single-use.
+        foreach (var _ in Enumerable.Range(0, 2))
         {
+            var uploadId = await UploadAsync(client, DefaultCsv);
             var created = await client.PostAsJsonAsync(
                 "/analyses", new { uploadId, verbatimColumn = "comment" });
             Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         }
 
+        var overLimit = await UploadAsync(client, DefaultCsv);
         var response = await client.PostAsJsonAsync(
-            "/analyses", new { uploadId, verbatimColumn = "comment" });
+            "/analyses", new { uploadId = overLimit, verbatimColumn = "comment" });
 
         Assert.Equal(HttpStatusCode.TooManyRequests, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task CreateAnalysis_PurgesTheSourceCsv()
+    {
+        var client = await SignedInClientAsync();
+        var uploadId = await UploadAsync(client, DefaultCsv);
+
+        var created = await client.PostAsJsonAsync(
+            "/analyses", new { uploadId, verbatimColumn = "comment" });
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var content = await db.Uploads
+            .Where(upload => upload.Id == uploadId)
+            .Select(upload => upload.Content)
+            .SingleAsync();
+        Assert.Empty(content);
+    }
+
+    [Fact]
+    public async Task DeleteAnalysis_RemovesItAndItsVerbatims()
+    {
+        var client = await SignedInClientAsync();
+        var analysis = await CreateAnalysisAsync(client);
+
+        var response = await client.DeleteAsync($"/analyses/{analysis.Id}");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.False(await db.Analyses.AnyAsync(candidate => candidate.Id == analysis.Id));
+        Assert.False(await db.Verbatims.AnyAsync(verbatim => verbatim.AnalysisId == analysis.Id));
+    }
+
+    [Fact]
+    public async Task DeleteAnalysis_AlsoDeletesItsShareToken()
+    {
+        var client = await SignedInClientAsync();
+        var analysis = await CreateAnalysisAsync(client);
+        await MarkSucceededAsync(analysis.Id);
+        (await client.PostAsync($"/analyses/{analysis.Id}/share", null)).EnsureSuccessStatusCode();
+
+        var response = await client.DeleteAsync($"/analyses/{analysis.Id}");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.False(await db.ShareTokens.AnyAsync(token => token.AnalysisId == analysis.Id));
+    }
+
+    [Fact]
+    public async Task DeleteAnalysis_OfAnotherAccount_Returns404AndLeavesItIntact()
+    {
+        var owner = await SignedInClientAsync();
+        var analysis = await CreateAnalysisAsync(owner);
+        var intruder = await SignedInClientAsync();
+
+        var response = await intruder.DeleteAsync($"/analyses/{analysis.Id}");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.True(await db.Analyses.AnyAsync(candidate => candidate.Id == analysis.Id));
+    }
+
+    [Fact]
+    public async Task DeleteAnalysis_WithoutASession_Returns401()
+    {
+        var response = await factory.CreateClient().DeleteAsync($"/analyses/{Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteAccount_ErasesTheAccountsAnalysesAndUploads()
+    {
+        var client = await SignedInClientAsync();
+        var uploadId = await UploadAsync(client, DefaultCsv);
+        var created = await client.PostAsJsonAsync(
+            "/analyses", new { uploadId, verbatimColumn = "comment" });
+        var analysis = await created.Content.ReadFromJsonAsync<AnalysisResponse>();
+        Assert.NotNull(analysis);
+
+        var response = await client.DeleteAsync("/auth/account");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.False(await db.Analyses.AnyAsync(candidate => candidate.Id == analysis.Id));
+        Assert.False(await db.Verbatims.AnyAsync(verbatim => verbatim.AnalysisId == analysis.Id));
+        Assert.False(await db.Uploads.AnyAsync(upload => upload.Id == uploadId));
+    }
+
+    private async Task MarkSucceededAsync(Guid analysisId)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        await db.Database.ExecuteSqlAsync(
+            $"UPDATE analyses SET status = 'succeeded', processed_count = verbatim_count WHERE id = {analysisId}");
     }
 }

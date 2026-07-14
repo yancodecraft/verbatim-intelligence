@@ -73,6 +73,16 @@ public static class AnalysesEndpoints
             db.Verbatims.AddRange(verbatims);
             await db.SaveChangesAsync(cancellationToken);
 
+            // Purge the raw CSV now that its verbatims are extracted: it has
+            // done its job, and keeping personal data from the untouched
+            // columns any longer serves nothing (docs/security-review.md, B2).
+            // An upload is single-use by design — one upload, one analysis.
+            await db.Uploads
+                .Where(candidate => candidate.Id == upload.Id)
+                .ExecuteUpdateAsync(
+                    setters => setters.SetProperty(u => u.Content, Array.Empty<byte>()),
+                    cancellationToken);
+
             // Signal after commit: the row is the source of truth. If this
             // push is lost, the analysis stays pending — the reaper will
             // requeue such orphans when it lands (see docs/architecture.md).
@@ -116,6 +126,18 @@ public static class AnalysesEndpoints
                 token => token.AnalysisId == analysis.Id, cancellationToken);
 
             return Results.Ok(AnalysisDetailResponse.From(analysis, unclassifiedCount, shared, themes));
+        });
+
+        // Right to erasure, scoped by the global query filter: another
+        // account's analysis is a plain 404. The database cascades the delete
+        // to its verbatims, themes and share token (docs/security-review.md, B1).
+        group.MapDelete("/{id:guid}", async (
+            Guid id, AppDbContext db, CancellationToken cancellationToken) =>
+        {
+            var deleted = await db.Analyses
+                .Where(analysis => analysis.Id == id)
+                .ExecuteDeleteAsync(cancellationToken);
+            return deleted == 0 ? Results.NotFound() : Results.NoContent();
         });
 
         return routes;

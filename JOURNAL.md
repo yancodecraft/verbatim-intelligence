@@ -6,6 +6,37 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-14 — Effacement RGPD backend : purge du CSV et suppression en cascade
+
+**Fait :** les bloquants RGPD B1 (droit à l'effacement) et B2 (CSV bruts
+conservés à vie) traités au niveau backend, en TDD.
+
+- **Purge du CSV brut à la création d'analyse** : une fois les verbatims
+  extraits, `uploads.content` est vidé. Le fichier a fait son travail ; garder
+  les colonnes non analysées (souvent nom/e-mail du répondant) plus longtemps
+  ne sert à rien.
+- **`DELETE /analyses/{id}`** (scopé compte, 404 cross-compte) et
+  **`DELETE /auth/account`** (self-service), la base cascadant l'effacement
+  jusqu'aux verbatims, thèmes, share tokens, uploads, sessions et login tokens.
+
+**Décisions :**
+
+- **Upload à usage unique.** La purge implique qu'un upload fonde exactement
+  une analyse. Vérifié dans le produit avant de trancher : ni re-run, ni
+  multi-colonne, ni retry ne sont exposés (aucun endpoint, aucune UI ; le
+  résultat est figé, cohérent avec la fidélité par construction), et l'UI ne
+  réutilise jamais un `uploadId`. Garder le CSV « pour plusieurs analyses »
+  n'aurait débloqué aucun usage réel. Le multi-analyse, s'il est voulu un jour,
+  sera une feature à part avec une rétention **bornée** — pas « à vie ». Le
+  glossaire est mis à jour (l'upload n'est plus « plusieurs analyses »).
+- **Effacement par cascade DB, pas applicatif.** Les FK `ON DELETE CASCADE`
+  existaient déjà ; un seul `ExecuteDelete` sur l'analyse (ou l'user) suffit,
+  et le query filter global garantit le scoping (cross-compte = 404 nu).
+
+Reste, pour clore le RGPD : exposer ces suppressions dans l'UI + la mention à
+l'upload et une page privacy (B3), puis le DPA/ZDR Anthropic et le registre de
+sous-traitance (non-code). 98 tests backend.
+
 ## 2026-07-14 — Durcissement pré-ouverture (headers, rate limiting par client)
 
 **Fait :** première salve de corrections issues de la

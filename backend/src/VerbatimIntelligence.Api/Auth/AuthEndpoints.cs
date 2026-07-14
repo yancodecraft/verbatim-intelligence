@@ -32,6 +32,7 @@ public static class AuthEndpoints
         group.MapPost("/verify", VerifyAsync);
         group.MapGet("/me", MeAsync);
         group.MapPost("/logout", LogoutAsync);
+        group.MapDelete("/account", DeleteAccountAsync).RequireAccount();
     }
 
     /// <summary>
@@ -190,6 +191,21 @@ public static class AuthEndpoints
             http.Response.Cookies.Delete(SessionCookieName);
         }
 
+        return TypedResults.NoContent();
+    }
+
+    // Right to erasure for the whole account: deleting the user cascades in
+    // the database to its analyses (and their verbatims, themes and share
+    // tokens), uploads, login tokens and sessions — its entire footprint
+    // (docs/security-review.md, B1). The session cookie is cleared too.
+    private static async Task<IResult> DeleteAccountAsync(
+        HttpContext http, AppDbContext db, CancellationToken cancellationToken)
+    {
+        var userId = http.CurrentUser().Id;
+        await db.Users
+            .Where(user => user.Id == userId)
+            .ExecuteDeleteAsync(cancellationToken);
+        http.Response.Cookies.Delete(SessionCookieName);
         return TypedResults.NoContent();
     }
 

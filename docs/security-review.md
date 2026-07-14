@@ -180,3 +180,14 @@ l'état, garder le basic-auth d'edge.
     Postgres non-superuser), et tous les bloquants RGPD.
   - Le retrait effectif du basic-auth n'est pas fait : le push sur `main`
     auto-déploie, l'ouverture reste conditionnée aux bloquants RGPD.
+- **2026-07-14 — effacement RGPD (backend).**
+  - **B2 corrigé** : le CSV brut (`uploads.content`) est purgé à la création
+    d'analyse, dès l'extraction des verbatims. Un upload devient à usage unique
+    (décision produit : ni re-run ni multi-analyse exposés en V1). Plus de CSV
+    orphelin conservé à vie.
+  - **B1 corrigé côté backend** : `DELETE /analyses/{id}` (scopé compte, cascade
+    DB vers verbatims/thèmes/share) et `DELETE /auth/account` (cascade vers
+    analyses, uploads, tokens, sessions ; cookie de session effacé). Testés.
+  - Restent : l'**exposition UI** de ces suppressions + la **mention à l'upload**
+    et la page privacy (B3), le **DPA/ZDR Anthropic** et le registre de
+    sous-traitance (démarches non-code).

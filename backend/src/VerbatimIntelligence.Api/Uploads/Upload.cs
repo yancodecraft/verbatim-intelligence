@@ -14,7 +14,11 @@ public sealed class Upload
 
     public required string Filename { get; init; }
 
-    /// <summary>The raw file bytes, re-parsed when an analysis is created.</summary>
+    /// <summary>
+    /// The raw file bytes, re-parsed when an analysis is created — then purged
+    /// (emptied) once its verbatims are extracted: an upload is single-use and
+    /// the raw CSV is not retained past analysis (docs/glossary.md, Upload).
+    /// </summary>
     public required byte[] Content { get; init; }
 
     /// <summary>Header names, in file order, as detected at parse time.</summary>

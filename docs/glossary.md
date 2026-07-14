@@ -12,8 +12,9 @@ Les termes récurrents des documents du projet, dans leur sens précis ici.
   stocké tel quel, en attente d'analyse. Il porte ses colonnes détectées et
   son nombre de lignes de données ; c'est la source depuis laquelle, une fois
   la colonne verbatim désignée (voir *Mapping*), les verbatims sont extraits
-  pour constituer le *Corpus* d'une analyse. Un même upload peut fonder
-  plusieurs analyses.
+  pour constituer le *Corpus* d'une analyse. Un upload est **à usage unique** :
+  créer l'analyse en purge le CSV brut (minimisation des données), donc un
+  upload fonde exactement une analyse.
 - **Thème (émergent)** (`Theme` dans le code) — un regroupement de verbatims
   découvert dans le corpus lui-même, sans taxonomie prédéfinie, pondéré par
   son volume. Chaque verbatim du thème lui est **rattaché** (`ThemeVerbatim`

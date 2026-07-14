@@ -182,6 +182,31 @@ public sealed partial class AuthEndpointsTests(ApiFactory factory)
         Assert.Equal(HttpStatusCode.Unauthorized, me.StatusCode);
     }
 
+    [Fact]
+    public async Task DeleteAccount_WithoutASession_Returns401()
+    {
+        var response = await factory.CreateClient().DeleteAsync("/auth/account");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteAccount_ClearsTheSessionAndRemovesTheUser()
+    {
+        var email = $"{Guid.NewGuid():N}@example.test";
+        var client = factory.CreateClient();
+        await SignInFlow.SignInAsync(client, factory.MailpitApiBaseAddress, email);
+
+        var response = await client.DeleteAsync("/auth/account");
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        // The session no longer resolves: the same client is anonymous again.
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/auth/me")).StatusCode);
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.False(await db.Users.AnyAsync(user => user.Email == email));
+    }
+
     private async Task<string> ReadMailedTokenAsync(string recipient)
     {
         var body = await ReadSingleMessageBodyAsync(recipient);

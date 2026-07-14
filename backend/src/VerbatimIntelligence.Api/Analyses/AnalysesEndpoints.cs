@@ -125,7 +125,15 @@ public static class AnalysesEndpoints
                         .ToList()))
                 .ToListAsync(cancellationToken);
 
-            return Results.Ok(AnalysisDetailResponse.From(analysis, themes));
+            // No silent loss: verbatims no step attached to any theme are
+            // counted, never inferred from the per-theme counts (a verbatim
+            // may support several themes). Always computed, never stored.
+            var unclassifiedCount = await db.Verbatims
+                .Where(verbatim => verbatim.AnalysisId == analysis.Id
+                    && !db.ThemeVerbatims.Any(tv => tv.VerbatimId == verbatim.Id))
+                .CountAsync(cancellationToken);
+
+            return Results.Ok(AnalysisDetailResponse.From(analysis, unclassifiedCount, themes));
         });
 
         return routes;
@@ -193,10 +201,11 @@ public sealed record AnalysisDetailResponse(
     int VerbatimCount,
     int ProcessedCount,
     string? Error,
+    int UnclassifiedCount,
     IReadOnlyList<ThemeResponse> Themes)
 {
     public static AnalysisDetailResponse From(
-        Analysis analysis, IReadOnlyList<ThemeResponse> themes) =>
+        Analysis analysis, int unclassifiedCount, IReadOnlyList<ThemeResponse> themes) =>
         new(
             analysis.Id,
             analysis.Status,
@@ -205,5 +214,6 @@ public sealed record AnalysisDetailResponse(
             analysis.VerbatimCount,
             analysis.ProcessedCount,
             analysis.Error,
+            unclassifiedCount,
             themes);
 }

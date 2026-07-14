@@ -25,6 +25,10 @@ Les termes récurrents des documents du projet, dans leur sens précis ici.
   texte) : la fidélité est vérifiée par test.
 - **Analyse** — le résultat complet d'un traitement de corpus : thèmes +
   synthèses + verbatims rattachés.
+- **Non classé** (`unclassified` dans le code) — un verbatim du corpus
+  qu'aucune étape n'a rattaché à un thème. Jamais une perte silencieuse :
+  le compte des non classés est toujours calculé (jamais stocké) et visible
+  dans les résultats de l'analyse.
 - **Mapping** (`ColumnMapping` dans le code) — l'étape d'upload où
   l'utilisateur désigne quelle colonne du CSV contient le verbatim.
 - **Compte** (`User` dans le code) — l'identité d'un utilisateur, réduite en

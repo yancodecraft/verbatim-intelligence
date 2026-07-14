@@ -34,6 +34,7 @@ public class AnalysesEndpointsTests(ApiFactory factory) : IClassFixture<ApiFacto
         int VerbatimCount,
         int ProcessedCount,
         string? Error,
+        int UnclassifiedCount,
         List<ThemeResponse> Themes);
 
     private sealed record UploadResult(Guid Id, List<string> Columns);
@@ -286,6 +287,66 @@ public class AnalysesEndpointsTests(ApiFactory factory) : IClassFixture<ApiFacto
         Assert.Equal("Too slow", cited.Text);
         Assert.Equal(1, cited.Position);
         Assert.Equal("Praise", detail.Themes[1].Name);
+        // Every verbatim is attached to at least one theme: no loss to report.
+        Assert.Equal(0, detail.UnclassifiedCount);
+    }
+
+    [Fact]
+    public async Task GetAnalysis_CountsAVerbatimInSeveralThemesOnce()
+    {
+        var client = await SignedInClientAsync();
+        var analysis = await CreateAnalysisAsync(
+            client, "comment", "comment,score\nfirst,1\nsecond,2\nthird,3\n");
+
+        // "first" supports two themes, "second" one, "third" none. Summing the
+        // per-theme counts would say 3 classified out of 2 distinct — only a
+        // count of verbatims without any attachment reports the loss right.
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var verbatims = await db.Verbatims
+                .Where(verbatim => verbatim.AnalysisId == analysis.Id)
+                .OrderBy(verbatim => verbatim.Position)
+                .ToListAsync();
+            var onboarding = new Theme
+            {
+                AnalysisId = analysis.Id,
+                Name = "Onboarding",
+                Synthesis = "Getting started is easy.",
+                Position = 0,
+            };
+            var pricing = new Theme
+            {
+                AnalysisId = analysis.Id,
+                Name = "Pricing",
+                Synthesis = "Plans feel fair.",
+                Position = 1,
+            };
+            db.Themes.AddRange(onboarding, pricing);
+            db.ThemeVerbatims.AddRange(
+                new ThemeVerbatim { ThemeId = onboarding.Id, VerbatimId = verbatims[0].Id, Rank = 0 },
+                new ThemeVerbatim { ThemeId = pricing.Id, VerbatimId = verbatims[0].Id, Rank = 0 },
+                new ThemeVerbatim { ThemeId = onboarding.Id, VerbatimId = verbatims[1].Id });
+            await db.SaveChangesAsync();
+        }
+
+        var detail = await client.GetFromJsonAsync<AnalysisDetailResponse>($"/analyses/{analysis.Id}");
+
+        Assert.NotNull(detail);
+        Assert.Equal(1, detail.UnclassifiedCount);
+    }
+
+    [Fact]
+    public async Task GetAnalysis_WithoutThemes_ReportsAllVerbatimsUnclassified()
+    {
+        var client = await SignedInClientAsync();
+        var analysis = await CreateAnalysisAsync(client);
+
+        var detail = await client.GetFromJsonAsync<AnalysisDetailResponse>($"/analyses/{analysis.Id}");
+
+        Assert.NotNull(detail);
+        Assert.Equal(analysis.VerbatimCount, detail.UnclassifiedCount);
+        Assert.Equal(2, detail.UnclassifiedCount);
     }
 
     [Fact]

@@ -98,6 +98,16 @@ class CostCapError(Exception):
     """The per-analysis cost cap was reached; the analysis must fail visibly."""
 
 
+class SupersededError(Exception):
+    """Another worker reclaimed the analysis; this attempt must not write.
+
+    `attempts` is the fencing token: the reaper hands a stale analysis to a
+    new claim, which bumps the counter — every write of this run is guarded
+    by `attempts = <ours>`, so a zombie worker aborts loudly instead of
+    corrupting its successor's results.
+    """
+
+
 @dataclass
 class _Theme:
     name: str
@@ -151,9 +161,13 @@ class _CostGuard:
 def run(
     connection: psycopg.Connection,
     analysis_id: uuid.UUID,
+    attempt: int,
     llm: SupportsAsk | None = None,
 ) -> None:
-    """Run the corpus of a claimed analysis through the full pipeline."""
+    """Run the corpus of a claimed analysis through the full pipeline.
+
+    `attempt` is the claim's fencing token (see SupersededError).
+    """
     verbatims = connection.execute(
         "SELECT id, text FROM verbatims WHERE analysis_id = %s ORDER BY position",
         (analysis_id,),
@@ -169,30 +183,27 @@ def run(
     if llm is None:
         llm = build_llm(language=detect_language(texts))
 
-    execution = _Execution(connection, analysis_id, llm, guard)
+    execution = _Execution(connection, analysis_id, llm, guard, attempt)
     candidates = execution.discover(texts)
     themes = _consolidate_locally(candidates, execution.merge(candidates))
     themes.sort(key=lambda theme: len(theme.verbatim_ids), reverse=True)
     themes = themes[:MAX_THEMES]
     for theme in themes:
         execution.summarize(texts, theme)
-    _write_results(connection, analysis_id, [vid for vid, _ in verbatims], themes)
+    _write_results(
+        connection, analysis_id, [vid for vid, _ in verbatims], themes, attempt
+    )
 
 
+@dataclass
 class _Execution:
     """One pipeline run: asks the LLM, meters spend, heartbeats, progresses."""
 
-    def __init__(
-        self,
-        connection: psycopg.Connection,
-        analysis_id: uuid.UUID,
-        llm: SupportsAsk,
-        guard: _CostGuard,
-    ) -> None:
-        self._connection = connection
-        self._analysis_id = analysis_id
-        self._llm = llm
-        self._guard = guard
+    _connection: psycopg.Connection
+    _analysis_id: uuid.UUID
+    _llm: SupportsAsk
+    _guard: _CostGuard
+    _attempt: int
 
     def discover(self, texts: list[str]) -> list[_Theme]:
         """Candidate themes per batch; every returned id is checked."""
@@ -283,15 +294,27 @@ class _Execution:
         reply = self._llm.ask(prompt, schema)
         self._guard.add(reply.input_tokens, reply.output_tokens)
         # One statement doubles as the heartbeat: spend, progress and sign of
-        # life move together, between every LLM call.
-        self._connection.execute(
+        # life move together, between every LLM call. Fenced by our attempt:
+        # zero rows updated means the reaper gave the analysis away while we
+        # were busy — stop before writing anything more.
+        result = self._connection.execute(
             "UPDATE analyses SET heartbeat_at = now(),"
             " input_tokens = input_tokens + %s,"
             " output_tokens = output_tokens + %s,"
             " processed_count = coalesce(%s, processed_count)"
-            " WHERE id = %s AND status = 'running'",
-            (reply.input_tokens, reply.output_tokens, processed, self._analysis_id),
+            " WHERE id = %s AND status = 'running' AND attempts = %s",
+            (
+                reply.input_tokens,
+                reply.output_tokens,
+                processed,
+                self._analysis_id,
+                self._attempt,
+            ),
         )
+        if result.rowcount == 0:
+            self._connection.rollback()
+            message = f"analysis {self._analysis_id} was reclaimed by another worker"
+            raise SupersededError(message)
         self._connection.commit()
         return reply.data
 
@@ -337,6 +360,7 @@ def _write_results(
     analysis_id: uuid.UUID,
     verbatim_uuids: list[uuid.UUID],
     themes: list[_Theme],
+    attempt: int,
 ) -> None:
     """Persist themes and attachments in one transaction.
 
@@ -344,6 +368,20 @@ def _write_results(
     indexes into what it was shown, the database receives foreign keys.
     """
     with connection.cursor() as cursor:
+        # Ownership check inside the same transaction as the inserts: if the
+        # reaper reclaimed the analysis, a later claim already bumped
+        # `attempts` and this attempt must not land a single row. The row
+        # lock this UPDATE takes also serializes any concurrent reaper pass
+        # behind our commit.
+        cursor.execute(
+            "UPDATE analyses SET heartbeat_at = now()"
+            " WHERE id = %s AND status = 'running' AND attempts = %s",
+            (analysis_id, attempt),
+        )
+        if cursor.rowcount == 0:
+            connection.rollback()
+            message = f"analysis {analysis_id} was reclaimed by another worker"
+            raise SupersededError(message)
         for position, theme in enumerate(themes):
             theme_id = uuid.uuid4()
             cursor.execute(

@@ -95,7 +95,11 @@ Postgres :
 
 - **Claim atomique** : le worker prend une analyse via
   `UPDATE … WHERE status = 'pending' … RETURNING` — jamais deux workers sur
-  la même analyse, même si un signal est publié deux fois.
+  la même analyse, même si un signal est publié deux fois. Le numéro de
+  tentative retourné sert de **token de fencing** : toute écriture du
+  worker est conditionnée par `attempts = <le sien>`, donc un worker
+  « zombie » repris par le reaper abandonne bruyamment au lieu d'écraser
+  le travail de son successeur.
 - **Heartbeat** : le worker horodate régulièrement l'analyse qu'il traite.
 - **Reaper** : un processus périodique (il tourne dans la boucle du worker)
   repasse en `pending` (et republie dans Redis) toute analyse `running` au

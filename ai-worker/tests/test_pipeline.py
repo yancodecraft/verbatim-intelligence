@@ -4,7 +4,13 @@ import pytest
 from conftest import fetch_analysis, insert_analysis, insert_verbatims
 
 from ai_worker.llm import LlmReply
-from ai_worker.pipeline import CostCapError, run
+from ai_worker.pipeline import (
+    CostCapError,
+    SupersededError,
+    _Theme,
+    _write_results,
+    run,
+)
 from ai_worker.processing import process_analysis
 
 if TYPE_CHECKING:
@@ -118,7 +124,7 @@ def test_pipeline_writes_themes_syntheses_and_citations_by_reference(
         ]
     )
 
-    run(connection, analysis_id, llm=llm)
+    run(connection, analysis_id, attempt=1, llm=llm)
 
     # Themes ordered by support, position decided by the worker.
     assert themes_of(connection, analysis_id) == [
@@ -149,7 +155,7 @@ def test_pipeline_processes_the_corpus_in_batches(
     analysis_id, _ = seed_running_analysis(connection, CORPUS)
     llm = ScriptedLlm([{"themes": []}, {"themes": []}, {"themes": []}])
 
-    run(connection, analysis_id, llm=llm)
+    run(connection, analysis_id, attempt=1, llm=llm)
 
     # 5 verbatims in batches of 2: three discovery calls, no theme to merge
     # or summarize, and every verbatim counted as processed.
@@ -166,7 +172,7 @@ def test_pipeline_does_nothing_on_an_empty_corpus(
     analysis_id = insert_analysis(connection, "running", attempts=1)
     llm = ScriptedLlm([])
 
-    run(connection, analysis_id, llm=llm)
+    run(connection, analysis_id, attempt=1, llm=llm)
 
     assert llm.prompts == []
     assert themes_of(connection, analysis_id) == []
@@ -186,7 +192,7 @@ def test_pipeline_stops_before_calling_past_the_cost_cap(
     llm = ScriptedLlm([])
 
     with pytest.raises(CostCapError, match="cost cap"):
-        run(connection, analysis_id, llm=llm)
+        run(connection, analysis_id, attempt=1, llm=llm)
 
     assert llm.prompts == []
 
@@ -210,3 +216,60 @@ def test_pipeline_failure_lands_as_a_failed_analysis(
     assert status == "failed"
     assert error is not None
     assert "cost cap" in error
+
+
+class HijackingLlm(ScriptedLlm):
+    """Simulates the reaper handing the analysis to another worker mid-run."""
+
+    def __init__(
+        self,
+        replies: list[dict[str, Any]],
+        connection: psycopg.Connection,
+        analysis_id: uuid.UUID,
+    ) -> None:
+        super().__init__(replies)
+        self._connection = connection
+        self._analysis_id = analysis_id
+
+    def ask(self, prompt: str, schema: dict[str, Any]) -> LlmReply:
+        reply = super().ask(prompt, schema)
+        # While this attempt was busy with the LLM, another worker claimed
+        # the analysis: attempts moved past ours.
+        self._connection.execute(
+            "UPDATE analyses SET attempts = attempts + 1 WHERE id = %s",
+            (self._analysis_id,),
+        )
+        self._connection.commit()
+        return reply
+
+
+def test_pipeline_aborts_when_another_worker_reclaimed_the_analysis(
+    connection: psycopg.Connection,
+) -> None:
+    analysis_id, _ = seed_running_analysis(connection, CORPUS)
+    llm = HijackingLlm([{"themes": []}], connection, analysis_id)
+
+    with pytest.raises(SupersededError):
+        run(connection, analysis_id, attempt=1, llm=llm)
+
+    assert themes_of(connection, analysis_id) == []
+
+
+def test_write_results_refuses_to_write_for_a_superseded_attempt(
+    connection: psycopg.Connection,
+) -> None:
+    analysis_id, verbatim_ids = seed_running_analysis(connection, CORPUS)
+    connection.execute("UPDATE analyses SET attempts = 2 WHERE id = %s", (analysis_id,))
+    connection.commit()
+    ghost = _Theme(
+        name="Ghost",
+        description="from a superseded attempt",
+        verbatim_ids=[0],
+        synthesis="Must never land.",
+        representative_ids=[0],
+    )
+
+    with pytest.raises(SupersededError):
+        _write_results(connection, analysis_id, verbatim_ids, [ghost], attempt=1)
+
+    assert themes_of(connection, analysis_id) == []

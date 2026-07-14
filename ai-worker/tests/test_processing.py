@@ -1,10 +1,10 @@
 import uuid
-from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from conftest import fetch_analysis, insert_analysis, insert_theme
 
-from ai_worker.processing import beat, process_analysis
+from ai_worker.pipeline import SupersededError
+from ai_worker.processing import process_analysis
 from ai_worker.redis_queue import PENDING_ANALYSES_KEY, pop_analysis_id
 
 if TYPE_CHECKING:
@@ -95,7 +95,9 @@ def test_process_marks_the_analysis_failed_when_the_pipeline_raises(
 ) -> None:
     analysis_id = insert_analysis(connection, "pending")
 
-    def explode(_connection: psycopg.Connection, _analysis_id: uuid.UUID) -> None:
+    def explode(
+        _connection: psycopg.Connection, _analysis_id: uuid.UUID, _attempt: int
+    ) -> None:
         message = "the pipeline exploded"
         raise RuntimeError(message)
 
@@ -109,11 +111,23 @@ def test_process_marks_the_analysis_failed_when_the_pipeline_raises(
     assert "the pipeline exploded" in error
 
 
-def test_beat_refreshes_the_heartbeat(connection: psycopg.Connection) -> None:
-    analysis_id = insert_analysis(connection, "running", heartbeat_age_seconds=600)
+def test_process_leaves_a_reclaimed_analysis_to_its_new_owner(
+    connection: psycopg.Connection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A superseded attempt must not fail (or touch) the analysis: another
+    # worker owns it now, its state is the truth.
+    analysis_id = insert_analysis(connection, "pending")
 
-    beat(connection, analysis_id)
+    def superseded(
+        _connection: psycopg.Connection, _analysis_id: uuid.UUID, _attempt: int
+    ) -> None:
+        message = "another worker reclaimed the analysis"
+        raise SupersededError(message)
 
-    _, _, _, heartbeat_at = fetch_analysis(connection, analysis_id)
-    assert heartbeat_at is not None
-    assert (datetime.now(tz=UTC) - heartbeat_at).total_seconds() < 60
+    monkeypatch.setattr("ai_worker.processing.run_pipeline", superseded)
+
+    assert process_analysis(connection, str(analysis_id)) is True
+
+    status, error, _, _ = fetch_analysis(connection, analysis_id)
+    assert status == "running"
+    assert error is None

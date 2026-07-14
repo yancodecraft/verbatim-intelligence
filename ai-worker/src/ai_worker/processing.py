@@ -24,52 +24,49 @@ def process_analysis(connection: psycopg.Connection, analysis_id: str) -> bool:
         logger.warning("ignoring malformed analysis id %r", analysis_id)
         return False
 
-    if not _claim(connection, claimed_id):
+    attempt = _claim(connection, claimed_id)
+    if attempt is None:
         return False
 
     _purge_previous_attempt(connection, claimed_id)
     try:
-        run_pipeline(connection, claimed_id)
+        run_pipeline(connection, claimed_id, attempt)
+    except pipeline.SupersededError:
+        # Another worker owns the analysis now (our heartbeat went stale and
+        # the reaper requeued it): its attempt is the truth, we write nothing
+        # — not even a failure.
+        logger.warning("analysis %s was reclaimed, dropping this attempt", claimed_id)
     except Exception as exc:
-        _fail(connection, claimed_id, str(exc) or type(exc).__name__)
+        _fail(connection, claimed_id, str(exc) or type(exc).__name__, attempt)
         logger.exception("analysis %s failed", claimed_id)
     else:
-        _complete(connection, claimed_id)
+        _complete(connection, claimed_id, attempt)
     return True
 
 
-def run_pipeline(connection: psycopg.Connection, analysis_id: uuid.UUID) -> None:
+def run_pipeline(
+    connection: psycopg.Connection, analysis_id: uuid.UUID, attempt: int
+) -> None:
     """Run the LLM pipeline on a claimed analysis (see ai_worker.pipeline)."""
-    pipeline.run(connection, analysis_id)
+    pipeline.run(connection, analysis_id, attempt)
 
 
-def beat(connection: psycopg.Connection, analysis_id: uuid.UUID) -> None:
-    """Record a sign of life; the reaper spares analyses with a fresh one.
-
-    Called between pipeline steps, so a step must stay well under the
-    reaper's staleness timeout (see ai_worker.reaper).
-    """
-    connection.execute(
-        "UPDATE analyses SET heartbeat_at = now() WHERE id = %s AND status = 'running'",
-        (analysis_id,),
-    )
-    connection.commit()
-
-
-def _claim(connection: psycopg.Connection, analysis_id: uuid.UUID) -> bool:
+def _claim(connection: psycopg.Connection, analysis_id: uuid.UUID) -> int | None:
     """Atomically take ownership: one UPDATE, two workers can never win.
 
     The claim also opens a clean attempt: heartbeat stamped, attempt
-    counted, the previous attempt's error and progress reset.
+    counted, the previous attempt's error and progress reset. The returned
+    attempt number is the fencing token guarding every later write (see
+    pipeline.SupersededError).
     """
     row = connection.execute(
         "UPDATE analyses SET status = 'running', heartbeat_at = now(),"
         " attempts = attempts + 1, error = NULL, processed_count = 0"
-        " WHERE id = %s AND status = 'pending' RETURNING id",
+        " WHERE id = %s AND status = 'pending' RETURNING attempts",
         (analysis_id,),
     ).fetchone()
     connection.commit()
-    return row is not None
+    return None if row is None else int(row[0])
 
 
 def _purge_previous_attempt(
@@ -83,20 +80,25 @@ def _purge_previous_attempt(
     connection.commit()
 
 
-def _fail(connection: psycopg.Connection, analysis_id: uuid.UUID, error: str) -> None:
+def _fail(
+    connection: psycopg.Connection, analysis_id: uuid.UUID, error: str, attempt: int
+) -> None:
     # Partial writes of the failed attempt must not survive it.
     connection.rollback()
     connection.execute(
         "UPDATE analyses SET status = 'failed', error = %s"
-        " WHERE id = %s AND status = 'running'",
-        (error, analysis_id),
+        " WHERE id = %s AND status = 'running' AND attempts = %s",
+        (error, analysis_id, attempt),
     )
     connection.commit()
 
 
-def _complete(connection: psycopg.Connection, analysis_id: uuid.UUID) -> None:
+def _complete(
+    connection: psycopg.Connection, analysis_id: uuid.UUID, attempt: int
+) -> None:
     connection.execute(
-        "UPDATE analyses SET status = 'succeeded' WHERE id = %s AND status = 'running'",
-        (analysis_id,),
+        "UPDATE analyses SET status = 'succeeded'"
+        " WHERE id = %s AND status = 'running' AND attempts = %s",
+        (analysis_id, attempt),
     )
     connection.commit()

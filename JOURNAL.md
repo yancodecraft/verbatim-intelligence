@@ -6,6 +6,71 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-14 — Revue de la tranche 4 : le zombie et le token de fencing
+
+La revue par agent sur l'ensemble de la tranche (7 commits) valide le
+socle — fidélité, plafond de coût, scoping, atomicité claim/reaper :
+« sound and adequately tested » — et rapporte deux findings, tous deux
+traités :
+
+1. **Important — l'écriture des résultats n'était pas fencée.** Scénario :
+   un worker bloqué assez longtemps pour que son heartbeat périme (GC,
+   throttling, réseau) se fait reprendre l'analyse par le reaper ; un
+   second worker la claime et travaille ; le premier — un « zombie » —
+   finit sa course et écrit ses thèmes par-dessus. Le garde
+   `status = 'running'` ne suffit pas : le successeur est *aussi*
+   `running`. Le bon discriminant est `attempts`, que chaque claim
+   incrémente — un **token de fencing** classique. Désormais le claim
+   retourne son numéro de tentative et **toutes** les écritures du worker
+   (heartbeat, résultats, `failed`, `succeeded`) portent
+   `AND attempts = %s` ; zéro ligne touchée = un successeur existe →
+   `SupersededError`, le zombie abandonne sans rien écrire — pas même un
+   échec, l'état du successeur est la vérité. Deux tests reproduisent le
+   scénario (reclaim en plein appel LLM ; reclaim juste avant l'écriture
+   des résultats).
+2. **Hygiène — `beat()` était du code mort** : le heartbeat réel vit dans
+   le pipeline (fusionné avec dépense et progression). Supprimé avec son
+   test.
+
+La revue a aussi failli signaler la syntaxe `except A, B:` comme une
+erreur — avant de vérifier que PEP 758 (Python 3.14) la rend valide. Bon
+réflexe des deux côtés : vérifier avant de rapporter.
+
+## 2026-07-14 — Le pipeline analyse 747 verbatims réels en production
+
+Dernière brique de la tranche 4. La clé API rejoint la production par le
+chemin de tous les secrets (prod-secrets.yml → `PROD_SECRETS` → env
+Ansible → compose) ; modèle et plafond restent sur les défauts du code.
+
+**La CI a d'abord attrapé un vrai bug** que trois jours de stack dev
+n'avaient jamais montré : sur une stack fraîche, le premier tour du reaper
+part avant que le backend n'ait appliqué les migrations —
+`UndefinedTable` est une `ProgrammingError`, hors du filet
+(`OperationalError` seul) de la boucle de survie : le worker mourait et
+plus rien ne consommait la file. Reproduit en local par `docker compose
+down -v`, corrigé (le filet attrape `psycopg.Error`, chaque retry
+reconnecte proprement), re-vérifié sur stack fraîche, et c'est le e2e de
+CI — celui-là même qui échouait — qui a validé le correctif.
+
+**Puis le parcours réel, en production** : magic link → upload de
+`browser_interoperability_features.csv` (State of CSS 2021, 787 lignes)
+→ 747 verbatims (40 cellules vides sautées) → `running`, progression
+visible par pas de 100 → **`succeeded` : 12 thèmes**, du « Safari as the
+primary compatibility blocker » (131 verbatims) au « CSS Grid and subgrid
+support » (163), avec des synthèses fidèles au ton du corpus.
+
+Les chiffres qui comptent :
+
+- **58 citations vérifiées programmatiquement contre le fichier source :
+  0 violation.** Chaque texte cité est la ligne d'origine, mot pour mot, à
+  sa position — l'invariant n°1 tient en production sur un corpus réel.
+- **747/747 traités** — aucune perte silencieuse.
+- **0,48 $** (45 481 tokens in, 10 118 out, une tentative) — la moitié du
+  plafond par défaut. La projection du spike était bonne.
+
+Reste, avant de déclarer la tranche finie : la revue par agent (en cours)
+et ses suites.
+
 ## 2026-07-14 — L'API restitue les analyses, et le contrat inter-briques est testé en vrai
 
 Quatrième brique de la tranche 4, en deux volets.

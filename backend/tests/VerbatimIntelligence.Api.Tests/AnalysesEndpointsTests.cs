@@ -292,6 +292,44 @@ public class AnalysesEndpointsTests(ApiFactory factory) : IClassFixture<ApiFacto
     }
 
     [Fact]
+    public async Task GetAnalysis_OrdersRepresentativesByRank()
+    {
+        var client = await SignedInClientAsync();
+        var analysis = await CreateAnalysisAsync(
+            client, "comment", "comment,score\nfirst,1\nsecond,2\nthird,3\n");
+
+        // Attachments are inserted out of rank order on purpose: the reading
+        // order must come from the ranks, not from insertion.
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var verbatims = await db.Verbatims
+                .Where(verbatim => verbatim.AnalysisId == analysis.Id)
+                .OrderBy(verbatim => verbatim.Position)
+                .ToListAsync();
+            var theme = new Theme
+            {
+                AnalysisId = analysis.Id,
+                Name = "Everything",
+                Synthesis = "All of it.",
+                Position = 0,
+            };
+            db.Themes.Add(theme);
+            db.ThemeVerbatims.AddRange(
+                new ThemeVerbatim { ThemeId = theme.Id, VerbatimId = verbatims[2].Id, Rank = 1 },
+                new ThemeVerbatim { ThemeId = theme.Id, VerbatimId = verbatims[0].Id, Rank = 2 },
+                new ThemeVerbatim { ThemeId = theme.Id, VerbatimId = verbatims[1].Id, Rank = 0 });
+            await db.SaveChangesAsync();
+        }
+
+        var detail = await client.GetFromJsonAsync<AnalysisDetailResponse>($"/analyses/{analysis.Id}");
+
+        Assert.NotNull(detail);
+        var cited = Assert.Single(detail.Themes).Representatives;
+        Assert.Equal(["second", "third", "first"], cited.Select(r => r.Text));
+    }
+
+    [Fact]
     public async Task GetAnalysis_CountsAVerbatimInSeveralThemesOnce()
     {
         var client = await SignedInClientAsync();

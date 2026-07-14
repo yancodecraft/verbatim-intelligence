@@ -111,6 +111,7 @@ onUnmounted(stopPolling);
 
 		<p v-if="notFound">This analysis was not found.</p>
 		<p v-else-if="failed">Something went wrong loading this analysis.</p>
+		<p v-else-if="!loaded">Loading analysis…</p>
 		<section v-else-if="analysis" class="analysis">
 			<header class="analysis-header">
 				<h2 class="filename">{{ analysis.sourceFilename }}</h2>

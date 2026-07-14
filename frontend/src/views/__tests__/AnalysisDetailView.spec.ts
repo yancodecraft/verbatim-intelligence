@@ -73,6 +73,16 @@ describe("AnalysisDetailView", () => {
 		vi.unstubAllGlobals();
 	});
 
+	it("shows a loading state until the first response arrives", async () => {
+		stubFetch([detail({})]);
+		const wrapper = mount(AnalysisDetailView);
+
+		expect(wrapper.text()).toContain("Loading analysis…");
+
+		await flushPromises();
+		expect(wrapper.text()).not.toContain("Loading analysis…");
+	});
+
 	it("shows progress while running, then polls until terminal and stops", async () => {
 		const fetchMock = stubFetch([
 			detail({ status: "running", processedCount: 3 }),

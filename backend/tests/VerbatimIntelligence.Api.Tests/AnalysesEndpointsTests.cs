@@ -421,4 +421,28 @@ public class AnalysesEndpointsTests(ApiFactory factory) : IClassFixture<ApiFacto
         Assert.NotNull(list);
         Assert.DoesNotContain(list, analysis => analysis.Id == mine.Id);
     }
+
+    [Fact]
+    public async Task CreateAnalysis_OverTheRateLimit_Returns429()
+    {
+        // A dedicated factory isolates the tiny window from the other tests.
+        await using var limited = factory.WithWebHostBuilder(builder =>
+            builder.UseSetting("RateLimiting:AnalysesPermitLimit", "2"));
+        var client = limited.CreateClient();
+        await SignInFlow.SignInAsync(
+            client, factory.MailpitApiBaseAddress, $"{Guid.NewGuid():N}@example.test");
+        var uploadId = await UploadAsync(client, DefaultCsv);
+
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            var created = await client.PostAsJsonAsync(
+                "/analyses", new { uploadId, verbatimColumn = "comment" });
+            Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        }
+
+        var response = await client.PostAsJsonAsync(
+            "/analyses", new { uploadId, verbatimColumn = "comment" });
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, response.StatusCode);
+    }
 }

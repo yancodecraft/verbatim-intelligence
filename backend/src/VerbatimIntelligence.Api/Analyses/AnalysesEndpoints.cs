@@ -10,10 +10,13 @@ namespace VerbatimIntelligence.Api.Analyses;
 
 public static class AnalysesEndpoints
 {
+    public const string RateLimitPolicy = "analyses";
+
     public static IEndpointRouteBuilder MapAnalyses(this IEndpointRouteBuilder routes)
     {
         var group = routes.MapGroup("/analyses").RequireAccount();
 
+        // Only creation is throttled (it enqueues LLM work); reads are not.
         group.MapPost("/", async (
             CreateAnalysisRequest? request,
             HttpContext http,
@@ -77,7 +80,7 @@ public static class AnalysesEndpoints
                 RedisKeys.PendingAnalyses, analysis.Id.ToString());
 
             return Results.Created($"/analyses/{analysis.Id}", AnalysisResponse.From(analysis));
-        });
+        }).RequireRateLimiting(RateLimitPolicy);
 
         // The account's analyses, newest first. The global query filter
         // (AppDbContext) scopes the set to the caller — another account's

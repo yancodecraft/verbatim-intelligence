@@ -104,4 +104,25 @@ public sealed class UploadsEndpointsTests(ApiFactory factory) : IClassFixture<Ap
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
+
+    [Fact]
+    public async Task Upload_OverTheRateLimit_Returns429()
+    {
+        // A dedicated factory isolates the tiny window from the other tests.
+        await using var limited = factory.WithWebHostBuilder(builder =>
+            builder.UseSetting("RateLimiting:UploadsPermitLimit", "2"));
+        var client = limited.CreateClient();
+        await SignInFlow.SignInAsync(
+            client, factory.MailpitApiBaseAddress, $"{Guid.NewGuid():N}@example.test");
+        var csv = Encoding.UTF8.GetBytes("verbatim\nfoo\n");
+
+        Assert.Equal(HttpStatusCode.Created,
+            (await client.PostAsync("/uploads", CsvContent(csv, "a.csv"))).StatusCode);
+        Assert.Equal(HttpStatusCode.Created,
+            (await client.PostAsync("/uploads", CsvContent(csv, "b.csv"))).StatusCode);
+
+        var response = await client.PostAsync("/uploads", CsvContent(csv, "c.csv"));
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, response.StatusCode);
+    }
 }

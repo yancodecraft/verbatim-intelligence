@@ -1,6 +1,8 @@
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 using StackExchange.Redis;
@@ -41,22 +43,47 @@ builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
 builder.Services.AddScoped<CurrentAccountAccessor>();
 builder.Services.AddHealthChecks().AddDbContextCheck<AppDbContext>();
 
-// Anti-abuse on the public shared-report endpoint (practices.md). A single
-// global window, not per-IP: behind the reverse proxy the app only sees the
-// proxy's address, so an IP partition would be global in disguise anyway.
+// Behind the compose reverse proxy the backend only sees the proxy's address.
+// Trust the private Docker network so X-Forwarded-For yields the real client
+// IP, which per-client rate limiting keys on. The backend has no published
+// port, so a public client cannot reach Kestrel to spoof the header, and
+// ForwardLimit 1 takes only the hop the proxy itself appended.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor;
+    options.ForwardLimit = 1;
+    foreach (var network in builder.Configuration
+        .GetSection("ForwardedHeaders:KnownNetworks").Get<string[]>() ?? [])
+    {
+        options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(network));
+    }
+});
+
+// Anti-abuse windows, each scoped per client (RateLimiting.ClientPartitionKey)
+// so one caller can never saturate them for everyone: the public shared-report
+// endpoint, plus the authenticated upload and analysis-creation writes whose
+// cost (storage, LLM tokens) makes them worth bounding (docs/security-review.md).
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    options.AddPolicy(ShareEndpoints.RateLimitPolicy, _ =>
-        RateLimitPartition.GetFixedWindowLimiter("shared-report", _ =>
-            new FixedWindowRateLimiterOptions
+    AddClientWindow(options, ShareEndpoints.RateLimitPolicy,
+        builder.Configuration.GetValue<int?>("RateLimiting:SharedPermitLimit") ?? 60);
+    AddClientWindow(options, UploadsEndpoints.RateLimitPolicy,
+        builder.Configuration.GetValue<int?>("RateLimiting:UploadsPermitLimit") ?? 20);
+    AddClientWindow(options, AnalysesEndpoints.RateLimitPolicy,
+        builder.Configuration.GetValue<int?>("RateLimiting:AnalysesPermitLimit") ?? 10);
+});
+
+static void AddClientWindow(RateLimiterOptions options, string policy, int permitLimit) =>
+    options.AddPolicy(policy, http =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            VerbatimIntelligence.Api.RateLimiting.ClientPartitionKey(http),
+            _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = builder.Configuration
-                    .GetValue<int?>("RateLimiting:SharedPermitLimit") ?? 60,
+                PermitLimit = permitLimit,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0,
             }));
-});
 
 var app = builder.Build();
 
@@ -73,7 +100,9 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 }
 
 // No UseHttpsRedirection: TLS terminates at the reverse proxy; the app only
-// ever serves plain HTTP inside the compose network.
+// ever serves plain HTTP inside the compose network. ForwardedHeaders first,
+// so the client IP is resolved before the rate limiter partitions on it.
+app.UseForwardedHeaders();
 app.UseRateLimiter();
 app.MapHealthChecks("/health");
 app.MapAuth();

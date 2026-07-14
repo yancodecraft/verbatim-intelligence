@@ -59,5 +59,10 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Email:From", "noreply@verbatim.test");
         builder.UseSetting("Auth:PublicBaseUrl", "http://localhost:5180");
         builder.UseSetting("Auth:SecureCookies", "false");
+        // Headroom so the suite's own traffic never trips a limit; the tests
+        // that assert throttling use a dedicated factory with a tiny window.
+        builder.UseSetting("RateLimiting:SharedPermitLimit", "1000");
+        builder.UseSetting("RateLimiting:UploadsPermitLimit", "1000");
+        builder.UseSetting("RateLimiting:AnalysesPermitLimit", "1000");
     }
 }

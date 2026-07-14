@@ -8,16 +8,24 @@
 		{{ basic_auth_user }} {$BASIC_AUTH_HASH}
 	}
 
-	# The shared-report URL carries the token: keep crawlers out, never
-	# leak it through referrers, and pin a strict CSP on the public page
-	# (docs/practices.md, ShareToken). style-src allows inline styles for
-	# the weight bars; scripts stay 'self' (Vite build output).
-	@shared path /shared/* /api/shared/*
-	header @shared {
-		X-Robots-Tag "noindex, nofollow"
+	# Security headers on every response (docs/security-review.md, O3/O4).
+	# The CSP fits the whole SPA: scripts stay 'self' (Vite build output),
+	# style-src allows inline styles for the weight bars. no-referrer
+	# everywhere because the shared-report URL carries a token. HSTS pins
+	# HTTPS; nosniff and frame-ancestors close sniffing and clickjacking.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
 		Referrer-Policy "no-referrer"
 		Content-Security-Policy "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'"
+		Permissions-Policy "geolocation=(), microphone=(), camera=()"
+		-Server
 	}
+
+	# Shared reports also stay out of search indexes (the token is public
+	# by design but must not be crawled).
+	@shared path /shared/* /api/shared/*
+	header @shared X-Robots-Tag "noindex, nofollow"
 
 	handle_path /api/* {
 		reverse_proxy backend:8080

@@ -161,3 +161,22 @@ l'état, garder le basic-auth d'edge.
 4. **Procédures** (D2→D4) : escrow clé age, alerte backup, rotations écrites —
    à traiter tôt car ce sont des risques de perte de données/service, pas de code.
 5. **Defense-in-depth** (D1, D5, D6) : opportuniste, après l'ouverture.
+
+## Suivi des corrections
+
+- **2026-07-14 — durcissement pré-ouverture (derrière le basic-auth).**
+  - **O1 corrigé** : le rate limit `/api/shared/*` est désormais partitionné par
+    client. `UseForwardedHeaders` (confiance au réseau Docker privé, `ForwardLimit`
+    1) résout l'IP réelle de l'appelant ; un seul client ne peut plus saturer la
+    fenêtre pour tout le monde.
+  - **O3 corrigé** : bloc `header` global dans Caddy sur toutes les routes — CSP,
+    HSTS (`max-age` 1 an, `includeSubDomains`), `X-Content-Type-Options: nosniff`,
+    `Referrer-Policy: no-referrer`, `Permissions-Policy`, `-Server`. Les pages
+    `/shared/*` gardent en plus `X-Robots-Tag: noindex`.
+  - **O4 corrigé** : fenêtres par client aussi sur `/uploads` (20/min) et la
+    création d'analyse (10/min), limites configurables.
+  - Restent ouverts : **O2** (le socle par-IP est là, mais le limiter du magic
+    link — ledger en base — n'a pas encore été repartitionné), **O5** (rôle
+    Postgres non-superuser), et tous les bloquants RGPD.
+  - Le retrait effectif du basic-auth n'est pas fait : le push sur `main`
+    auto-déploie, l'ouverture reste conditionnée aux bloquants RGPD.

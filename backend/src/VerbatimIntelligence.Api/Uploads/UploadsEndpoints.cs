@@ -5,6 +5,8 @@ namespace VerbatimIntelligence.Api.Uploads;
 
 public static class UploadsEndpoints
 {
+    public const string RateLimitPolicy = "uploads";
+
     private const int SampleRowLimit = 5;
     private const int FilenameMaxLength = 255;
 
@@ -15,6 +17,7 @@ public static class UploadsEndpoints
         // sent on cross-site POSTs — the same CSRF stance as the other writes.
         routes.MapGroup("/uploads").RequireAccount()
             .MapPost("/", UploadAsync)
+            .RequireRateLimiting(RateLimitPolicy)
             .DisableAntiforgery();
 
         return routes;

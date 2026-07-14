@@ -6,6 +6,44 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-14 — Durcissement pré-ouverture (headers, rate limiting par client)
+
+**Fait :** première salve de corrections issues de la
+[security review](docs/security-review.md), posée **derrière le basic-auth**
+sans rien ouvrir — O1, O3, O4.
+
+- **Headers de sécurité globaux dans Caddy** (`Caddyfile.j2`) : un bloc `header`
+  sur toutes les routes — CSP identique à celle des pages partagées (elle
+  couvre toute la SPA), HSTS un an `includeSubDomains`, `X-Content-Type-Options:
+  nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy`, `-Server`. Les
+  `/shared/*` gardent en plus `X-Robots-Tag: noindex`. Avant, seules les pages
+  publiques étaient couvertes.
+- **Rate limiting par client** (`Program.cs`) : `UseForwardedHeaders` (confiance
+  au réseau Docker privé, `ForwardLimit` 1) résout l'IP réelle derrière Caddy,
+  et les fenêtres sont partitionnées dessus au lieu d'être globales. Le DoS
+  trivial du rapport partagé (un seul client saturant la fenêtre pour tous)
+  tombe. Fenêtres ajoutées sur l'upload et la création d'analyse (coût stockage
+  et LLM), en plus de `/shared`.
+
+**Décisions :**
+
+- **Pourquoi maintenant et pas au retrait du basic-auth :** le push sur `main`
+  auto-déploie. Retirer l'exemption Caddy ouvrirait la prod à des données
+  personnelles de tiers avant le RGPD (pas de suppression, pas de mention, pas
+  de DPA) — interdit par practices.md. Le durcissement, lui, est sûr et
+  vérifiable tout de suite derrière le basic-auth. Le retrait effectif reste le
+  dernier geste, après le RGPD (arbitrage Yannick).
+- **La confiance au proxy est sûre ici** : le backend n'a aucun port publié
+  (seul Caddy l'atteint), donc `X-Forwarded-For` n'est pas spoofable de
+  l'extérieur ; `ForwardLimit` 1 ne prend que le hop ajouté par Caddy.
+- **Repartitionner le limiter du magic link (O2) est reporté** : c'est un ledger
+  en base, pas le rate limiter ASP.NET — un chantier à part.
+
+Tests : 90 backend (dont un unitaire sur la clé de partition et deux
+intégration 429 sur upload et création d'analyse). Le CSP de l'app n'est pas
+couvert par l'e2e (qui tape le Vite dev, pas Caddy) : à vérifier en prod au
+déploiement.
+
 ## 2026-07-14 — Security review d'ouverture menée
 
 **Fait :** la security review qui conditionne l'ouverture publique — les dix

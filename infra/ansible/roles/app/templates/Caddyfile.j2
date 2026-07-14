@@ -1,8 +1,22 @@
 {{ app_domain }} {
 	# Basic auth at the edge while the app is not public yet
 	# (docs/roadmap.md, slice 1). The hash comes from the environment.
-	basic_auth {
+	# Shared reports are the exception: a share link is public by design
+	# (docs/roadmap.md, slice 6) — everything else stays protected.
+	@protected not path /shared/* /api/shared/*
+	basic_auth @protected {
 		{{ basic_auth_user }} {$BASIC_AUTH_HASH}
+	}
+
+	# The shared-report URL carries the token: keep crawlers out, never
+	# leak it through referrers, and pin a strict CSP on the public page
+	# (docs/practices.md, ShareToken). style-src allows inline styles for
+	# the weight bars; scripts stay 'self' (Vite build output).
+	@shared path /shared/* /api/shared/*
+	header @shared {
+		X-Robots-Tag "noindex, nofollow"
+		Referrer-Policy "no-referrer"
+		Content-Security-Policy "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'"
 	}
 
 	handle_path /api/* {

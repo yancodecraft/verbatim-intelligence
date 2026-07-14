@@ -33,11 +33,15 @@ async function readMailedToken(email: string): Promise<string> {
 	return token as string;
 }
 
-// The slices 3-5 journey on top of auth: an anonymous visitor is walled off,
+// The slices 3-6 journey on top of auth: an anonymous visitor is walled off,
 // signs in through a real e-mail round-trip, uploads a CSV, maps the verbatim
 // column, runs the analysis, sees it cross the whole stack until it succeeds,
-// and reads the results on the analysis screen.
-test("sign in, run an analysis, and read its results", async ({ page }) => {
+// reads the results on the analysis screen, then shares the report, reads it
+// anonymously, and revokes the link.
+test("sign in, run an analysis, read and share its results", async ({
+	page,
+	browser,
+}) => {
 	const email = `e2e-${Date.now()}@example.test`;
 
 	// Anonymous: the home page redirects to sign-in.
@@ -98,6 +102,42 @@ test("sign in, run an analysis, and read its results", async ({ page }) => {
 		.filter({ hasText: "I love the new dashboard" });
 	await expect(quote).toBeVisible();
 	await expect(quote.locator("cite")).toHaveText("row 1");
+
+	// Share the report: the raw link is shown once, extract its token.
+	await page.getByRole("button", { name: "Create share link" }).click();
+	const shareUrl = await page.locator(".share-link input").inputValue();
+	const shareToken = /\/shared\/([A-Za-z0-9_-]+)$/.exec(shareUrl)?.[1];
+	expect(shareToken).toBeDefined();
+
+	// A visitor with no cookies reads the report through the link alone —
+	// navigating relative to baseURL, since PublicBaseUrl targets the host.
+	const anonymousContext = await browser.newContext();
+	const anonymousPage = await anonymousContext.newPage();
+	await anonymousPage.goto(`/shared/${shareToken}`);
+	await expect(anonymousPage.getByText("feedback.csv")).toBeVisible();
+	const sharedTheme = anonymousPage.locator(".theme").first();
+	await expect(sharedTheme).toBeVisible();
+	await expect(
+		sharedTheme
+			.locator("blockquote")
+			.filter({ hasText: "I love the new dashboard" })
+			.locator("cite"),
+	).toHaveText("row 1");
+	// Read-only and anonymous: no session UI at all.
+	await expect(
+		anonymousPage.getByRole("button", { name: "Sign out" }),
+	).toHaveCount(0);
+
+	// Revocation cuts the link off for real (practices.md: tested e2e).
+	await page.getByRole("button", { name: "Revoke" }).click();
+	await expect(
+		page.getByRole("button", { name: "Create share link" }),
+	).toBeVisible();
+	await anonymousPage.reload();
+	await expect(
+		anonymousPage.getByText("This report is not available."),
+	).toBeVisible();
+	await anonymousContext.close();
 
 	// Sign out drops the session for real.
 	await page.getByRole("button", { name: "Sign out" }).click();

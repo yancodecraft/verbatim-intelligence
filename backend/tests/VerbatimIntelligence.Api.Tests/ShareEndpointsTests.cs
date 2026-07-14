@@ -194,6 +194,27 @@ public class ShareEndpointsTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task PostShare_Concurrently_NeverFailsAndLeavesOneLink()
+    {
+        var client = await SignedInClientAsync();
+        var analysis = await CreateSucceededAnalysisAsync(client);
+
+        // Two tabs, an impatient double click, a network retry: concurrent
+        // creations must all succeed — the replacement is serialized on the
+        // analysis row, the last writer's link is the one that survives.
+        var responses = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ =>
+            client.PostAsync($"/analyses/{analysis.Id}/share", null)));
+
+        Assert.All(responses, response =>
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode));
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Equal(1, await db.ShareTokens.CountAsync(
+            token => token.AnalysisId == analysis.Id));
+    }
+
+    [Fact]
     public async Task DeleteShare_RevokesTheLink()
     {
         var client = await SignedInClientAsync();

@@ -39,6 +39,14 @@ public static class ShareEndpoints
             // One active link per analysis: creating replaces any previous
             // link (the raw is only shown once — regeneration is the way to
             // get a fresh one, and it revokes the old link by construction).
+            // The replacement is serialized on the analysis row: without the
+            // lock, two concurrent creations would both pass the delete and
+            // collide on the unique analysis_id index — a bare 500.
+            await using var transaction =
+                await db.Database.BeginTransactionAsync(cancellationToken);
+            await db.Database.ExecuteSqlAsync(
+                $"SELECT id FROM analyses WHERE id = {analysis.Id} FOR UPDATE",
+                cancellationToken);
             await db.ShareTokens
                 .Where(token => token.AnalysisId == analysis.Id)
                 .ExecuteDeleteAsync(cancellationToken);
@@ -53,6 +61,7 @@ public static class ShareEndpoints
                 CreatedAt = clock.GetUtcNow(),
             });
             await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
 
             var url = $"{authOptions.Value.PublicBaseUrl}/shared/{raw}";
             return Results.Ok(new ShareResponse(url));

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { RouterView, useRouter } from "vue-router";
+import { RouterLink, RouterView, useRouter } from "vue-router";
 import { useSession } from "./session";
 
 const session = useSession();
@@ -22,6 +22,10 @@ async function signOut(): Promise<void> {
 	</header>
 
 	<RouterView />
+
+	<footer>
+		<RouterLink :to="{ name: 'privacy' }">Privacy</RouterLink>
+	</footer>
 </template>
 
 <style scoped>
@@ -30,6 +34,14 @@ header {
 }
 
 header p {
+	opacity: 0.7;
+}
+
+footer {
+	margin-top: 3rem;
+	padding-top: 1rem;
+	border-top: 1px solid rgba(128, 128, 128, 0.2);
+	font-size: 0.85rem;
 	opacity: 0.7;
 }
 </style>

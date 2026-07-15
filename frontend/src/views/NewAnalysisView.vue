@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { useRouter } from "vue-router";
+import { RouterLink, useRouter } from "vue-router";
 
 interface UploadPreview {
 	id: string;
@@ -106,7 +106,8 @@ async function runAnalysis(): Promise<void> {
 		<p class="notice">
 			Your verbatims are processed by a third-party AI service (Anthropic) to
 			group them into themes. Only upload feedback you are allowed to share,
-			and the raw file is discarded once the analysis is created.
+			and the raw file is discarded once the analysis is created. See our
+			<RouterLink :to="{ name: 'privacy' }">privacy policy</RouterLink>.
 		</p>
 
 		<p v-if="error" class="error">{{ error }}</p>

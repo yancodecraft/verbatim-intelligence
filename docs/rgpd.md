@@ -5,17 +5,13 @@ Ce document tient lieu de **registre des activités de traitement**
 « conformité » de la [security review](security-review.md). La politique de
 confidentialité destinée aux utilisateurs (page publique `/privacy`) en dérive.
 
-> **À compléter par Yannick** (informations que le code ne peut pas fournir) :
-> - **Responsable de traitement** : identité légale (personne physique ou
->   société, n° SIREN le cas échéant), adresse.
-> - **Contact** : e-mail dédié aux demandes RGPD (droits des personnes).
-> - Ces deux éléments sont publics par nature (ils figurent dans la politique
->   de confidentialité) ; ils ne relèvent pas des « constantes privées » du repo.
-
 ## 1. Responsable de traitement
 
-- **Responsable** : `[À COMPLÉTER : identité légale]`
-- **Contact RGPD** : `[À COMPLÉTER : e-mail]`
+- **Responsable** : YANTECH (exploitant de Verbatim Intelligence).
+- **Contact RGPD** : privacy@yantech.fr — *alias à créer/forwarder côté domaine
+  yantech.fr s'il n'existe pas encore ; le TEM est déjà configuré sur ce domaine.*
+- **DPO** : aucun — non requis pour cette structure (pas de traitement à grande
+  échelle de données sensibles au sens de l'Article 37 RGPD).
 - **Rôle** : Verbatim Intelligence agit comme **responsable de traitement**
   pour les comptes (e-mails de connexion) et comme **sous-traitant** pour les
   verbatims que ses clients y déposent (données de leurs propres répondants).
@@ -71,18 +67,19 @@ certains clients Claude API / entreprise, **soumis à l'approbation d'Anthropic*
 à demander à l'équipe commerciale. Par défaut (sans ZDR) : pas d'entraînement,
 mais rétention des logs opérationnels ~7 jours.
 
-**À décider** : le défaut (pas d'entraînement, logs ~7 j) est-il acceptable, ou
-faut-il demander le ZDR strict ? Pour le demander : contacter Anthropic (sales /
-support) depuis l'organisation API. Tant que le ZDR n'est pas confirmé par
-écrit, ne pas l'affirmer publiquement — la politique de confidentialité doit
-décrire le comportement **réel**.
+**Décision (2026-07-15)** : on **reste sur le défaut commercial** (pas
+d'entraînement, logs supprimés sous ~7 j). C'est conforme et suffisant pour
+cette structure ; le ZDR strict est un dispositif entreprise dont on n'a pas
+besoin. La politique de confidentialité décrit donc ce comportement réel — sans
+prétendre au ZDR. À rouvrir seulement si un client l'exige contractuellement.
 
 Références Anthropic : [API and data retention](https://platform.claude.com/docs/en/manage-claude/api-and-data-retention),
 [ZDR — produits couverts](https://privacy.claude.com/en/articles/8956058-i-have-a-zero-data-retention-agreement-with-anthropic-what-products-does-it-apply-to).
 
 ## 6. Ce qui reste avant ouverture
 
-- [ ] Renseigner le responsable de traitement et le contact RGPD (§1).
-- [ ] Vérifier que l'organisation Anthropic est sous Commercial Terms (DPA) ; décider ZDR ou non (§5).
-- [ ] Publier la **politique de confidentialité** (page `/privacy`), dérivée de ce registre.
+- [x] Responsable de traitement (YANTECH) et contact RGPD renseignés (§1).
+- [ ] Créer/forwarder l'alias `privacy@yantech.fr` (côté domaine).
+- [ ] Vérifier que l'organisation Anthropic est bien sous Commercial Terms (DPA automatique). ZDR : non demandé, on reste sur le défaut (§5).
+- [x] Politique de confidentialité publiée (page `/privacy`, dérivée de ce registre).
 - [ ] Livrer la purge périodique des tokens/comptes expirés (finding D5).

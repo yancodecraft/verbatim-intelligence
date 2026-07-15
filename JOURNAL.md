@@ -24,9 +24,17 @@ décisions. Entrées les plus récentes en haut.
 
 **Décision :** je ne peux ni signer le DPA ni activer le ZDR à la place de
 Yannick, mais le DPA est en fait automatique sous les Commercial Terms — reste
-à le vérifier. Deux infos manquent, que seul Yannick a : l'identité du
-responsable de traitement et un e-mail de contact RGPD (placeholders dans
-`rgpd.md`). Elles conditionnent la politique de confidentialité publique.
+à le vérifier. Le responsable de traitement est **YANTECH**, sans DPO (non
+requis), contact `privacy@yantech.fr` (alias à créer côté domaine). ZDR : on
+**reste sur le défaut commercial** (pas d'entraînement, logs ~7 j) — conforme
+et suffisant, le ZDR strict est un dispositif entreprise inutile ici.
+
+**Fait aussi :** la **page publique `/privacy`** (`PrivacyView`, route sans
+auth), dérivée du registre : opérateur, données traitées, sous-traitants
+(Anthropic, Scaleway), rétention, droits. Liée depuis la mention à l'upload et
+un pied de page. L'e2e vérifie qu'elle est accessible sans session. 35 tests
+front. Reste, côté Yannick : créer l'alias e-mail et vérifier les Commercial
+Terms Anthropic.
 
 ## 2026-07-15 — Petits durcissements : encodage token, access-log, session expirée
 

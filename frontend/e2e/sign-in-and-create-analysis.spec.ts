@@ -151,4 +151,11 @@ test("sign in, run an analysis, read and share its results", async ({
 	await expect(page).toHaveURL(/\/sign-in$/);
 	await page.goto("/");
 	await expect(page).toHaveURL(/\/sign-in$/);
+
+	// The privacy policy is public: reachable with no session, no redirect.
+	await page.goto("/privacy");
+	await expect(page).toHaveURL(/\/privacy$/);
+	await expect(
+		page.getByRole("heading", { name: "Privacy policy" }),
+	).toBeVisible();
 });

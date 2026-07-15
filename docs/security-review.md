@@ -265,3 +265,15 @@ l'état, garder le basic-auth d'edge.
     — il n'apparaît donc pas dans l'`argv` du process (visible par `ps`/`docker
     top`/outillage d'audit). Rayon d'exposition du secret réduit au strict
     `/opt/verbatim/.env` (0600).
+- **2026-07-15 — SSH non-root (F7), étapes A+B.**
+  - Le déploiement ne se connecte plus en `root` : un utilisateur `deploy`
+    (même clé, sudo sans mot de passe) est créé par le rôle hardening, et
+    l'inventaire bascule dessus avec `become: true` (les 3 smoke tests délégués
+    à localhost gardent `become: false`). Un déploiement complet a été exercé
+    **de bout en bout sous cette identité** (hardening, docker, app, backup,
+    smoke tests) — chemin non-root prouvé, réversible.
+  - **Reste l'étape C (irréversible)** : passer `PermitRootLogin` de
+    `prohibit-password` à `no`. Faite séparément, après confirmation du filet
+    de secours (console Scaleway) — un lockout SSH ne se rollback pas par le
+    pipeline. Un rebuild from-scratch d'un hôte neuf exige une connexion root
+    ponctuelle pour créer le `deploy` (noté dans l'inventaire).

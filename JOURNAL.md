@@ -6,6 +6,25 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-15 — SSH non-root (F7), étapes A+B ; alerte backup activée
+
+**Fait :**
+- **Alerte d'échec de backup activée** (D3) : `backup_ping_url` provisionné dans
+  les deux copies du secret, déploiement relançant un backup immédiat → ping →
+  le dead-man's-switch healthchecks.io est vert. Une absence de ping (backup
+  cassé, serveur mort) alerte désormais.
+- **F7, étapes A+B** : le déploiement ne se connecte plus en `root`. Un
+  utilisateur `deploy` (même clé, sudo sans mot de passe) est créé par le rôle
+  hardening ; l'inventaire bascule dessus avec `become: true`. Déploiement
+  complet exercé de bout en bout sous cette identité.
+
+**Décision — F7 étagé, arrêt avant l'irréversible :** créer le user +
+basculer l'inventaire (réversible, root encore actif) est fait et prouvé ;
+désactiver `PermitRootLogin` (étape C) attend la confirmation du filet console
+Scaleway, car un lockout SSH ne se rollback pas par le pipeline qui se connecte
+justement en SSH. `become: false` explicite sur les smoke tests délégués à
+localhost (sinon ils tenteraient un `sudo` dans le conteneur Ansible).
+
 ## 2026-07-15 — O5 appliqué : rôle Postgres applicatif non-superuser
 
 **Fait :** backend et worker ne se connectent plus à Postgres en superuser.

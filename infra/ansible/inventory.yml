@@ -3,5 +3,8 @@ all:
   hosts:
     verbatim:
       ansible_host: 51.158.72.142
-      ansible_user: root
+      # Deployments connect as the non-root deploy user and sudo to root
+      # (F7, become at the play level). First-time bootstrap of a brand-new
+      # host still needs a one-time root connection to create this user.
+      ansible_user: deploy
       ansible_ssh_private_key_file: /keys/verbatim_ed25519

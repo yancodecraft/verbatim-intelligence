@@ -3,6 +3,8 @@
 # image tag included).
 - name: Configure the verbatim server
   hosts: verbatim
+  # Connect as the non-root deploy user, sudo to root for the work (F7).
+  become: true
   vars_files:
     # Mounted by `make configure` / `make deploy` from outside the repo.
     - /secrets/prod.yml

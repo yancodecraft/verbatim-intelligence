@@ -210,3 +210,10 @@ l'état, garder le basic-auth d'edge.
   - **F6 corrigé** : l'e-mail du magic link est validé avec le parser d'envoi
     (`MailboxAddress.TryParse`) — une adresse exotique donne un 400 propre, plus
     un 500 après création du token.
+- **2026-07-15 — petits durcissements (B2, B4, D6).**
+  - **B2 corrigé** : le token de partage est encodé (`encodeURIComponent`) avant
+    le fetch côté front — un token forgé ne peut plus ré-aiguiller vers un autre
+    endpoint.
+  - **B4 corrigé** : commentaire dans le Caddyfile interdisant les access-logs
+    non masqués sur `/shared/*` et `/verify` (le token est dans l'URL).
+  - **D6 (partiel)** : test ajouté — une session expirée est rejetée (401).

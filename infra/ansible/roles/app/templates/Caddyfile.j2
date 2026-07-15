@@ -1,4 +1,8 @@
 {{ app_domain }} {
+	# No access log on purpose (docs/security-review.md, B4): the URL path
+	# carries secrets — /shared/{token} and /verify?token=. If one is ever
+	# enabled for debugging, redact those paths first.
+
 	# Basic auth at the edge while the app is not public yet
 	# (docs/roadmap.md, slice 1). The hash comes from the environment.
 	# Shared reports are the exception: a share link is public by design

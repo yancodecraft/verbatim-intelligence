@@ -33,7 +33,11 @@ function addMeta(name: string, content: string): void {
 
 async function load(): Promise<void> {
 	try {
-		const response = await fetch(`/api/shared/${route.params.token}`);
+		// Encode the path segment: the router decodes it, so a crafted token
+		// like "../analyses/<id>" would otherwise re-target another endpoint
+		// (docs/security-review.md, B2).
+		const token = encodeURIComponent(String(route.params.token));
+		const response = await fetch(`/api/shared/${token}`);
 		if (!response.ok) {
 			// Revoked, unknown or broken: one generic message, no distinction.
 			throw new Error(`unexpected status ${response.status}`);

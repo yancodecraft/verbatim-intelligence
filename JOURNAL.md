@@ -6,6 +6,17 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-15 — Petits durcissements : encodage token, access-log, session expirée
+
+**Fait :** trois findings mineurs de la [review](docs/security-review.md).
+
+- **B2** : le token de partage est encodé (`encodeURIComponent`) avant le fetch
+  côté front — un token forgé (`../analyses/…`) ne peut plus ré-aiguiller la
+  requête vers un autre endpoint.
+- **B4** : commentaire dans le Caddyfile interdisant tout access-log non masqué
+  sur `/shared/*` et `/verify` (le secret est dans l'URL).
+- **D6** : test ajouté pour le rejet d'une session expirée (401).
+
 ## 2026-07-15 — Durcissement auth : rate limit login, race single-use, validation e-mail
 
 **Fait :** premier lot des findings restants de la

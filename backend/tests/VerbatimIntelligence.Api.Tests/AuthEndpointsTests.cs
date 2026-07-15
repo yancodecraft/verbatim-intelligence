@@ -208,6 +208,36 @@ public sealed partial class AuthEndpointsTests(ApiFactory factory)
     }
 
     [Fact]
+    public async Task Me_WithAnExpiredSession_Returns401()
+    {
+        var raw = Tokens.CreateRaw();
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var user = new User
+            {
+                Email = $"{Guid.NewGuid():N}@example.test",
+                CreatedAt = DateTimeOffset.UtcNow,
+            };
+            db.Users.Add(user);
+            db.Sessions.Add(new Session
+            {
+                UserId = user.Id,
+                TokenHash = Tokens.Hash(raw),
+                CreatedAt = DateTimeOffset.UtcNow.AddDays(-31),
+                ExpiresAt = DateTimeOffset.UtcNow.AddDays(-1),
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var request = new HttpRequestMessage(HttpMethod.Get, "/auth/me");
+        request.Headers.Add("Cookie", $"vi_session={raw}");
+        var response = await factory.CreateClient().SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
     public async Task RequestMagicLink_WithAMalformedEmail_Returns400NotServerError()
     {
         // Contains '@' (the old check passed) but the mail library cannot parse

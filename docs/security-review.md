@@ -272,8 +272,21 @@ l'état, garder le basic-auth d'edge.
     à localhost gardent `become: false`). Un déploiement complet a été exercé
     **de bout en bout sous cette identité** (hardening, docker, app, backup,
     smoke tests) — chemin non-root prouvé, réversible.
-  - **Reste l'étape C (irréversible)** : passer `PermitRootLogin` de
-    `prohibit-password` à `no`. Faite séparément, après confirmation du filet
-    de secours (console Scaleway) — un lockout SSH ne se rollback pas par le
-    pipeline. Un rebuild from-scratch d'un hôte neuf exige une connexion root
-    ponctuelle pour créer le `deploy` (noté dans l'inventaire).
+  - **Étape C (désactiver le SSH root) écartée — décision 2026-07-15.** Deux
+    raisons : (1) bénéfice marginal — `deploy` a un sudo **sans mot de passe**,
+    donc une clé compromise donne `deploy` → `root` quoi qu'il arrive ; le gain
+    réel de F7 (ne plus opérer en root) est déjà pris par A+B. (2) Pas de filet
+    turnkey — la console série Scaleway exige un login/mot de passe qu'aucun
+    compte n'a (accès par clé seulement), donc un lockout imposerait le mode
+    rescue. Root reste joignable **par clé uniquement** (`prohibit-password`),
+    ce qui est déjà solide. À rouvrir seulement si on met d'abord un vrai filet
+    (mot de passe console sur `deploy`, testé). **F7 est clos à ce niveau.**
+- **2026-07-15 — clôture de la review.** Tous les findings sont traités :
+  bloquants RGPD (B1→B4), durcissement pré-ouverture (O1→O5) et
+  defense-in-depth/procédures (D1→D6, F-series) — appliqués, ou explicitement
+  écartés avec justification (F4 rate limit `/health`, F7 étape C). Il ne reste
+  aucun bloquant de durcissement à l'ouverture ; celle-ci n'attend plus que le
+  geste délibéré de retrait du basic-auth d'edge. Deux actions opérateur de
+  confort restent optionnelles et documentées dans
+  [runbooks.md](runbooks.md) : escrow hors-ligne de la clé `age` (fait) et
+  rotations. L'alerte d'échec de backup (D3) est **active** (healthchecks.io).

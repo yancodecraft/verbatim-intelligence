@@ -18,12 +18,17 @@ décisions. Entrées les plus récentes en haut.
   hardening ; l'inventaire bascule dessus avec `become: true`. Déploiement
   complet exercé de bout en bout sous cette identité.
 
-**Décision — F7 étagé, arrêt avant l'irréversible :** créer le user +
-basculer l'inventaire (réversible, root encore actif) est fait et prouvé ;
-désactiver `PermitRootLogin` (étape C) attend la confirmation du filet console
-Scaleway, car un lockout SSH ne se rollback pas par le pipeline qui se connecte
-justement en SSH. `become: false` explicite sur les smoke tests délégués à
-localhost (sinon ils tenteraient un `sudo` dans le conteneur Ansible).
+**Décision — F7 clos à A+B, étape C écartée :** créer le user + basculer
+l'inventaire (réversible, root encore actif) est fait et prouvé sur les deux
+chemins (make deploy local et CI). Désactiver `PermitRootLogin` (étape C) est
+**écarté** : bénéfice marginal (le sudo NOPASSWD de `deploy` fait qu'une clé
+volée donne root de toute façon — le vrai gain « ne plus opérer en root » est
+déjà pris) face à un risque réel (la console série Scaleway n'est pas un filet
+turnkey sans mot de passe de compte ; un lockout SSH ne se rollback pas par le
+pipeline). Root reste joignable par clé seulement. À rouvrir seulement si on
+pose d'abord un vrai secours. Détail technique : `become: false` explicite sur
+les smoke tests délégués à localhost (sinon ils tenteraient un `sudo` dans le
+conteneur Ansible).
 
 ## 2026-07-15 — O5 appliqué : rôle Postgres applicatif non-superuser
 

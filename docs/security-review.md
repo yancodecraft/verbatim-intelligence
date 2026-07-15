@@ -198,3 +198,15 @@ l'état, garder le basic-auth d'edge.
     (contenu traité par un service tiers, Anthropic ; fichier brut purgé après
     analyse). La **politique de confidentialité complète** et le **DPA** restent
     à faire (démarches non-code).
+- **2026-07-15 — durcissement auth (O2, F3, D1, F6).**
+  - **O2/F3 corrigés** : fenêtres de rate limit par client aussi sur
+    `/auth/magic-link` (10/min) et `/auth/verify` (20/min), en plus du ledger
+    en base par adresse. Un seul IP ne peut plus épuiser le cap global du login
+    ni marteler la vérification de token.
+  - **D1 corrigé** : la consommation du magic link est atomique (`UPDATE …
+    WHERE used_at IS NULL`, contrôle du rowcount) — sous concurrence, un seul
+    appelant établit une session, les autres reçoivent 401. La garantie « une
+    seule fois » tient désormais sous course.
+  - **F6 corrigé** : l'e-mail du magic link est validé avec le parser d'envoi
+    (`MailboxAddress.TryParse`) — une adresse exotique donne un 400 propre, plus
+    un 500 après création du token.

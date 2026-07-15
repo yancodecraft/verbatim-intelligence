@@ -72,6 +72,10 @@ builder.Services.AddRateLimiter(options =>
         builder.Configuration.GetValue<int?>("RateLimiting:UploadsPermitLimit") ?? 20);
     AddClientWindow(options, AnalysesEndpoints.RateLimitPolicy,
         builder.Configuration.GetValue<int?>("RateLimiting:AnalysesPermitLimit") ?? 10);
+    AddClientWindow(options, AuthEndpoints.MagicLinkRateLimitPolicy,
+        builder.Configuration.GetValue<int?>("RateLimiting:MagicLinkPermitLimit") ?? 10);
+    AddClientWindow(options, AuthEndpoints.VerifyRateLimitPolicy,
+        builder.Configuration.GetValue<int?>("RateLimiting:VerifyPermitLimit") ?? 20);
 });
 
 static void AddClientWindow(RateLimiterOptions options, string policy, int permitLimit) =>

@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
+using MimeKit;
+
 using VerbatimIntelligence.Api.Data;
 using VerbatimIntelligence.Api.Email;
 
@@ -9,6 +11,13 @@ namespace VerbatimIntelligence.Api.Auth;
 public static class AuthEndpoints
 {
     public const string SessionCookieName = "vi_session";
+
+    // Per-client windows (RateLimiting.ClientPartitionKey) on top of the
+    // per-address database ledger: the ledger stops mailbox bombing of one
+    // address, these stop a single IP from exhausting the global cap or
+    // hammering token verification (docs/security-review.md, O2/F3).
+    public const string MagicLinkRateLimitPolicy = "auth-magic-link";
+    public const string VerifyRateLimitPolicy = "auth-verify";
 
     private static readonly TimeSpan LoginTokenLifetime = TimeSpan.FromMinutes(15);
     private static readonly TimeSpan SessionLifetime = TimeSpan.FromDays(30);
@@ -28,8 +37,10 @@ public static class AuthEndpoints
         // the /api prefix before forwarding — same contract as /analyses.
         var group = app.MapGroup("/auth");
 
-        group.MapPost("/magic-link", RequestMagicLinkAsync);
-        group.MapPost("/verify", VerifyAsync);
+        group.MapPost("/magic-link", RequestMagicLinkAsync)
+            .RequireRateLimiting(MagicLinkRateLimitPolicy);
+        group.MapPost("/verify", VerifyAsync)
+            .RequireRateLimiting(VerifyRateLimitPolicy);
         group.MapGet("/me", MeAsync);
         group.MapPost("/logout", LogoutAsync);
         group.MapDelete("/account", DeleteAccountAsync).RequireAccount();
@@ -64,7 +75,10 @@ public static class AuthEndpoints
         CancellationToken cancellationToken)
     {
         var email = request.Email?.Trim().ToLowerInvariant() ?? "";
-        if (email.Length is 0 or > 320 || !email.Contains('@', StringComparison.Ordinal))
+        // Parse with the same library that sends the mail: an address that
+        // validates here cannot make the sender throw later (a 500 after the
+        // token was already created). See docs/security-review.md, F6.
+        if (email.Length is 0 or > 320 || !MailboxAddress.TryParse(email, out _))
         {
             return TypedResults.ValidationProblem(new Dictionary<string, string[]>
             {
@@ -143,7 +157,19 @@ public static class AuthEndpoints
             return TypedResults.Unauthorized();
         }
 
-        loginToken.MarkUsed(now);
+        // Atomic single-use: only one concurrent caller flips used_at from
+        // null. The loser of the race gets a 401, so a replayed link really
+        // works once, not once-per-race (docs/security-review.md, D1).
+        var claimed = await db.LoginTokens
+            .Where(candidate => candidate.Id == loginToken.Id && candidate.UsedAt == null)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(candidate => candidate.UsedAt, now),
+                cancellationToken);
+        if (claimed == 0)
+        {
+            return TypedResults.Unauthorized();
+        }
+
         var rawSession = Tokens.CreateRaw();
         db.Sessions.Add(new Session
         {

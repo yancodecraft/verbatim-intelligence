@@ -207,6 +207,65 @@ public sealed partial class AuthEndpointsTests(ApiFactory factory)
         Assert.False(await db.Users.AnyAsync(user => user.Email == email));
     }
 
+    [Fact]
+    public async Task RequestMagicLink_WithAMalformedEmail_Returns400NotServerError()
+    {
+        // Contains '@' (the old check passed) but the mail library cannot parse
+        // it — this used to reach the sender and throw a 500.
+        var response = await factory.CreateClient().PostAsJsonAsync(
+            "/auth/magic-link", new { email = "broken@" });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task RequestMagicLink_IsRateLimitedPerClient()
+    {
+        await using var limited = factory.WithWebHostBuilder(builder =>
+            builder.UseSetting("RateLimiting:MagicLinkPermitLimit", "2"));
+        var client = limited.CreateClient();
+
+        Assert.Equal(HttpStatusCode.Accepted, (await client.PostAsJsonAsync(
+            "/auth/magic-link", new { email = "a@example.test" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Accepted, (await client.PostAsJsonAsync(
+            "/auth/magic-link", new { email = "b@example.test" })).StatusCode);
+
+        var response = await client.PostAsJsonAsync(
+            "/auth/magic-link", new { email = "c@example.test" });
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Verify_IsRateLimitedPerClient()
+    {
+        await using var limited = factory.WithWebHostBuilder(builder =>
+            builder.UseSetting("RateLimiting:VerifyPermitLimit", "2"));
+        var client = limited.CreateClient();
+
+        await client.PostAsJsonAsync("/auth/verify", new { token = Tokens.CreateRaw() });
+        await client.PostAsJsonAsync("/auth/verify", new { token = Tokens.CreateRaw() });
+
+        var response = await client.PostAsJsonAsync(
+            "/auth/verify", new { token = Tokens.CreateRaw() });
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Verify_UnderConcurrentReplay_EstablishesExactlyOneSession()
+    {
+        var client = factory.CreateClient();
+        await client.PostAsJsonAsync("/auth/magic-link", new { email = "race@example.test" });
+        var token = await ReadMailedTokenAsync("race@example.test");
+
+        var attempts = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ =>
+            factory.CreateClient().PostAsJsonAsync("/auth/verify", new { token })));
+
+        Assert.Equal(1, attempts.Count(r => r.StatusCode == HttpStatusCode.NoContent));
+        Assert.Equal(3, attempts.Count(r => r.StatusCode == HttpStatusCode.Unauthorized));
+    }
+
     private async Task<string> ReadMailedTokenAsync(string recipient)
     {
         var body = await ReadSingleMessageBodyAsync(recipient);

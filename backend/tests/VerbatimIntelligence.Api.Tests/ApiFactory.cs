@@ -64,5 +64,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("RateLimiting:SharedPermitLimit", "1000");
         builder.UseSetting("RateLimiting:UploadsPermitLimit", "1000");
         builder.UseSetting("RateLimiting:AnalysesPermitLimit", "1000");
+        builder.UseSetting("RateLimiting:MagicLinkPermitLimit", "1000");
+        builder.UseSetting("RateLimiting:VerifyPermitLimit", "1000");
     }
 }

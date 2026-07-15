@@ -6,6 +6,31 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-15 — Durcissement auth : rate limit login, race single-use, validation e-mail
+
+**Fait :** premier lot des findings restants de la
+[security review](docs/security-review.md), sur l'authentification (O2, F3,
+D1, F6), en TDD.
+
+- **Rate limit par client sur le login** : fenêtres par IP sur
+  `/auth/magic-link` (10/min) et `/auth/verify` (20/min), en plus du ledger en
+  base par adresse. Le ledger arrête le mail-bombing d'une adresse ; les
+  fenêtres par IP empêchent un seul client d'épuiser le cap global (déni de
+  service du login) ou de marteler la vérification de token.
+- **Consommation atomique du magic link** : `UPDATE … WHERE used_at IS NULL`
+  avec contrôle du rowcount, à la place du lire-puis-écrire. Sous course, un
+  seul appelant gagne le claim ; les autres reçoivent 401. Le « works once »
+  annoncé dans l'e-mail tient maintenant sous concurrence.
+- **Validation e-mail robuste** : le magic link parse l'adresse avec la même
+  bibliothèque que l'envoi (`MailboxAddress.TryParse`) — une adresse qui passe
+  ne peut plus faire jeter l'expéditeur (500 après création du token) ; une
+  adresse invalide donne un 400 propre.
+
+102 tests backend. Prochains lots : purge des tokens/comptes expirés et
+`/health` (D5), rôle Postgres non-superuser (O5), procédures backup/rotations
+(D2–D4), plus le volet non-code (politique de confidentialité, registre de
+sous-traitance, DPA/ZDR Anthropic).
+
 ## 2026-07-14 — Effacement RGPD dans l'UI et mention à l'upload
 
 **Fait :** l'effacement devient utilisable, et l'information de traitement est

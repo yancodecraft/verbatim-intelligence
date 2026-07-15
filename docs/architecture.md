@@ -82,9 +82,13 @@ ai-worker/    Python ───────────────┘
   noms connus — et rattrape ou compte ce qui manque) ; et **la langue des
   synthèses est détectée par le code et injectée au prompt**, jamais
   laissée à l'appréciation du modèle.
-- **Zero-data-retention côté API Anthropic.** Les verbatims contiennent des
-  données personnelles de tiers ; leur traitement par le LLM se fait sans
-  rétention ni entraînement. C'est un choix d'architecture, pas un réglage.
+- **Traitement LLM sous le DPA d'Anthropic.** Les verbatims contiennent des
+  données personnelles de tiers. Le DPA d'Anthropic (intégré d'office aux
+  Commercial Terms depuis 2026-01-01) encadre le traitement : entrées et
+  sorties **jamais utilisées pour l'entraînement**, logs opérationnels
+  supprimés sous ~7 jours. Le zero-data-retention strict (aucune rétention) est
+  un arrangement entreprise soumis à l'approbation d'Anthropic — à demander et
+  confirmer, **pas supposé acquis** (voir [rgpd.md](rgpd.md)).
 
 ### Résilience du traitement asynchrone
 

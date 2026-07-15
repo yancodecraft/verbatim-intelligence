@@ -6,6 +6,28 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-15 — RGPD non-code : registre de sous-traitance et correction du ZDR
+
+**Fait :** le volet non-code du RGPD, amorcé côté documentation.
+
+- **Correction d'une affirmation fausse (finding A5)** : les docs présentaient
+  le « zero-data-retention Anthropic » comme acquis (« choix d'architecture,
+  pas un réglage »). En réalité, le ZDR strict est un arrangement entreprise
+  soumis à approbation, **pas le défaut**. Le défaut (DPA commercial, effectif
+  2026-01-01, intégré d'office) : pas d'entraînement, logs opérationnels ~7 j.
+  `architecture.md` et `practices.md` corrigés pour dire le vrai.
+- **Nouveau [docs/rgpd.md](docs/rgpd.md)** : registre de sous-traitance
+  (Article 30) — Anthropic (LLM, US, DPA commercial), Scaleway (hébergement +
+  backups + e-mail, UE) — politique de rétention, droits des personnes, et un
+  runbook DPA/ZDR pour Yannick (vérifier les Commercial Terms ; décider s'il
+  faut demander le ZDR strict).
+
+**Décision :** je ne peux ni signer le DPA ni activer le ZDR à la place de
+Yannick, mais le DPA est en fait automatique sous les Commercial Terms — reste
+à le vérifier. Deux infos manquent, que seul Yannick a : l'identité du
+responsable de traitement et un e-mail de contact RGPD (placeholders dans
+`rgpd.md`). Elles conditionnent la politique de confidentialité publique.
+
 ## 2026-07-15 — Petits durcissements : encodage token, access-log, session expirée
 
 **Fait :** trois findings mineurs de la [review](docs/security-review.md).

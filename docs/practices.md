@@ -165,9 +165,11 @@ finie quand :
   en e2e ; rate limiting sur l'endpoint public.
 - **Rate limiting** aussi sur la connexion (magic links) et l'upload ; le
   coût LLM est plafonné par analyse.
-- **Données personnelles (RGPD)** : zero-data-retention côté API Anthropic,
-  information à l'upload, suppression en cascade, pas de corpus réels hors
-  production. DPA et registre de sous-traitance : prérequis d'ouverture.
+- **Données personnelles (RGPD)** : traitement LLM sous le DPA d'Anthropic
+  (pas d'entraînement, rétention log courte ; le ZDR strict est un arrangement
+  entreprise à confirmer), information à l'upload, suppression en cascade, pas
+  de corpus réels hors production. Le [registre de sous-traitance](rgpd.md) et
+  la politique de confidentialité sont des prérequis d'ouverture.
 - L'application déployée reste derrière un basic-auth de proxy tant que la
   V1 n'est pas ouverte ; l'ouverture publique est conditionnée à une
   **security review** dont la checklist minimale est : autorisation/IDOR
@@ -184,7 +186,8 @@ finie quand :
   supplémentaire.
 - Les documents de référence vivent dans `docs/` : [spec](v1-spec.md),
   [architecture](architecture.md), [roadmap](roadmap.md),
-  [glossaire](glossary.md), et ce document.
+  [glossaire](glossary.md), [RGPD](rgpd.md),
+  [security review](security-review.md), et ce document.
 
 ## Langues
 

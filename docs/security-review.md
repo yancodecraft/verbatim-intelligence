@@ -217,3 +217,10 @@ l'état, garder le basic-auth d'edge.
   - **B4 corrigé** : commentaire dans le Caddyfile interdisant les access-logs
     non masqués sur `/shared/*` et `/verify` (le token est dans l'URL).
   - **D6 (partiel)** : test ajouté — une session expirée est rejetée (401).
+- **2026-07-15 — purge périodique des tables d'auth (D5/A4).**
+  - Un service de fond (`AuthCleanupService`, horaire) supprime les login
+    tokens et sessions expirés, et les comptes **jamais utilisés** (aucune
+    session, aucun token vivant, aucune analyse ni upload, plus vieux que 30 j)
+    — un e-mail n'est plus conservé indéfiniment après un lien de connexion
+    resté sans suite. Prédicat strict : un compte porteur de données n'est
+    jamais touché. Logique testée en isolation.

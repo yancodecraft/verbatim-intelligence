@@ -43,6 +43,13 @@ builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
 builder.Services.AddScoped<CurrentAccountAccessor>();
 builder.Services.AddHealthChecks().AddDbContextCheck<AppDbContext>();
 
+// Periodic auth-table hygiene (docs/security-review.md, D5). Disabled in tests,
+// which drive the cleanup routine directly against a throwaway database.
+if (builder.Configuration.GetValue("Auth:CleanupEnabled", true))
+{
+    builder.Services.AddHostedService<AuthCleanupService>();
+}
+
 // Behind the compose reverse proxy the backend only sees the proxy's address.
 // Trust the private Docker network so X-Forwarded-For yields the real client
 // IP, which per-client rate limiting keys on. The backend has no published

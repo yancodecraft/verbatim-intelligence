@@ -6,6 +6,22 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-15 — Purge périodique des tables d'auth (finding D5/A4)
+
+**Fait :** un `AuthCleanupService` (service de fond, passe horaire) qui supprime
+les login tokens et sessions expirés, et les **comptes jamais utilisés**.
+
+**Décision — prédicat très conservateur pour l'effacement de comptes.** Un
+compte n'est supprimé que s'il est plus vieux que 30 jours **et** n'a aucune
+session, aucun login token vivant, aucune analyse et aucun upload. Un compte
+qui porte la moindre donnée n'est jamais touché — le risque d'effacer un
+utilisateur dormant réel est écarté par construction. Un e-mail qui a juste
+demandé un lien sans jamais rien en faire finit par disparaître (minimisation) ;
+se reconnecter recrée un compte vierge de façon transparente. La logique
+(`AuthCleanup.RunAsync`) est testée en isolation ; le service est désactivé
+dans les tests (`Auth:CleanupEnabled=false`) pour ne pas courir après leurs
+données.
+
 ## 2026-07-15 — RGPD non-code : registre de sous-traitance et correction du ZDR
 
 **Fait :** le volet non-code du RGPD, amorcé côté documentation.

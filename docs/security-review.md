@@ -235,3 +235,13 @@ l'état, garder le basic-auth d'edge.
   - **F4 accepté** : pas de rate limit sur `/health` — le front le sonde en
     continu, un plafond y casserait le poll pour un gain « Info ». À revisiter à
     l'edge si besoin après ouverture.
+- **2026-07-15 — dead-man's-switch de backup (D3).**
+  - Le script de backup pinge une URL (`BACKUP_PING_URL`) après un upload
+    réussi ; l'absence de ping alerte via healthchecks.io. Câblage déployé mais
+    **inactif tant que l'URL n'est pas provisionnée** (défaut vide = zéro
+    risque). Étapes d'activation dans [runbooks.md](runbooks.md).
+  - **Restent, gated sur une action opérateur** : **O5** (rôle Postgres
+    non-superuser — exige un nouveau secret `APP_DB_PASSWORD` dans les deux
+    copies avant deploy, sinon le deploy casse) et **F7** (SSH non-root — à
+    faire en deux temps : créer le user de déploiement, vérifier, puis désactiver
+    root ; un « rollback » ne récupère pas un lockout SSH).

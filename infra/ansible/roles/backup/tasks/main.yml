@@ -3,9 +3,11 @@
 # age key (the server cannot read its own backups), and ships it to a
 # versioned Object Storage bucket. Restore is exercised from a workstation
 # holding the private key: make backup-restore-test.
-- name: Install age (encryption)
+- name: Install age (encryption) and curl (backup ping)
   ansible.builtin.apt:
-    name: age
+    name:
+      - age
+      - curl
     state: present
 
 - name: Template the backup environment (S3 credentials, 0600)

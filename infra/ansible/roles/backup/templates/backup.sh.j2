@@ -11,3 +11,9 @@ docker exec verbatim-postgres-1 pg_dump -U verbatim -Fc verbatim \
       {{ aws_cli_image }} \
       --endpoint-url https://s3.fr-par.scw.cloud --region fr-par \
       s3 cp - "s3://$BACKUP_BUCKET/verbatim-$stamp.dump.age"
+
+# Dead-man's-switch: ping only on success (set -e exits before this on any
+# failure), so a missing ping alerts the operator (docs/security-review.md, D3).
+if [ -n "${BACKUP_PING_URL:-}" ]; then
+  curl -fsS -m 10 "$BACKUP_PING_URL" >/dev/null || true
+fi

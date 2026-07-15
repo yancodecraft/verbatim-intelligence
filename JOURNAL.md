@@ -6,6 +6,30 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-15 — Dead-man's-switch de backup ; O5/F7 gated sur action opérateur
+
+**Fait :** l'alerte d'échec de backup (D3) est câblée. Le script de backup
+pinge `BACKUP_PING_URL` après un upload réussi ; l'absence de ping (backup
+cassé ou serveur mort) déclenche l'alerte via healthchecks.io. Défaut vide →
+inactif et sans risque tant que Yannick n'a pas fourni l'URL (étapes dans
+[runbooks.md](docs/runbooks.md)).
+
+**Décision — les deux derniers findings ne sont pas « blind-applicables » :**
+- **O5** (rôle Postgres non-superuser) exige un nouveau secret `APP_DB_PASSWORD`
+  distinct du superuser (sinon la séparation de privilèges est vaine), à mettre
+  dans `prod-secrets.yml` **et** `PROD_SECRETS` **avant** tout deploy — sans
+  quoi le déploiement casse sur une variable manquante. Conçu (db-init idempotent
+  qui crée le rôle + grants DML + `ALTER DEFAULT PRIVILEGES` ; backend/worker
+  basculent sur ce rôle, `migrate` reste superuser), mais non poussé : il attend
+  le secret.
+- **F7** (SSH non-root) doit être **étagé** : créer le user de déploiement (clé
+  + sudo), vérifier qu'un deploy passe sous cette identité, puis désactiver
+  `PermitRootLogin`. Un lockout SSH ne se « rollback » pas par le pipeline (qui
+  se connecte en SSH) — d'où le refus de le faire en un coup, malgré le feu vert.
+
+Tout le reste de la review est appliqué. Il ne reste, avant ouverture, que ces
+deux durcissements (gated opérateur) et les prérequis non-code déjà listés.
+
 ## 2026-07-15 — Garde anti-IDOR par métadonnée et runbooks d'exploitation
 
 **Fait :** findings F9 (architecture) et D4/D2 (procédures).

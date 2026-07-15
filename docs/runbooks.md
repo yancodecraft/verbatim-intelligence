@@ -62,6 +62,20 @@ jamais.
 clé privée `age` — gestionnaire de mots de passe chiffré et/ou papier en lieu
 sûr. À faire une fois, et à revérifier après toute régénération de la clé.
 
+## Alerte d'échec de backup (dead-man's-switch)
+
+Le backup « ping » une URL à chaque succès ; l'absence de ping déclenche
+l'alerte. Le câblage est en place (`backup.sh` pinge `BACKUP_PING_URL` après un
+upload réussi) mais **inactif tant que l'URL n'est pas fournie**.
+
+Activation (une fois) :
+1. Créer un check sur [healthchecks.io](https://healthchecks.io) (gratuit),
+   période 1 jour + grâce, avec ton canal d'alerte (e-mail).
+2. Copier l'URL de ping du check dans `backup_ping_url` — dans
+   `prod-secrets.yml` **et** le secret GitHub `PROD_SECRETS`.
+3. Redéployer. Dès lors : un backup qui échoue (ou un serveur mort) = pas de
+   ping = alerte.
+
 ## Restauration d'un backup
 
 `make backup-restore-test` télécharge le dernier backup, le déchiffre (clé

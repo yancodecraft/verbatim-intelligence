@@ -245,3 +245,18 @@ l'état, garder le basic-auth d'edge.
     copies avant deploy, sinon le deploy casse) et **F7** (SSH non-root — à
     faire en deux temps : créer le user de déploiement, vérifier, puis désactiver
     root ; un « rollback » ne récupère pas un lockout SSH).
+- **2026-07-15 — rôle Postgres applicatif non-superuser (O5).**
+  - **O5 corrigé** : à l'exécution, backend et worker se connectent avec
+    `verbatim_app`, un rôle **sans SUPERUSER/CREATEDB/CREATEROLE** limité au
+    DML (SELECT/INSERT/UPDATE/DELETE). Le rôle est créé/rafraîchi par un
+    one-shot `db-init` (`infra/…/files/db-init.sql`) qui tourne **après**
+    `migrate` à chaque déploiement — idempotent, il porte aussi la rotation du
+    mot de passe applicatif. `migrate` garde le superuser (propriétaire du
+    schéma). Une injection SQL ou une brique compromise ne donne plus les
+    pleins pouvoirs (`COPY … TO PROGRAM`, lecture de `pg_authid`, DDL).
+  - **Garde en CI** : un test d'intégration exécute le **vrai** `db-init.sql`
+    sur une base migrée jetable et prouve le moindre privilège — `verbatim_app`
+    fait le DML de l'app (dont le `SELECT … FOR UPDATE` du partage) mais se voit
+    refuser chaque geste superuser. Élargir les droits casse le test.
+  - **Secret provisionné** : `app_db_password` ajouté aux deux copies
+    (fichier local + `PROD_SECRETS`). Reste **F7** (SSH non-root).

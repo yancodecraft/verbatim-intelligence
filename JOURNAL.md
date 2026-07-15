@@ -6,6 +6,35 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-15 — O5 appliqué : rôle Postgres applicatif non-superuser
+
+**Fait :** backend et worker ne se connectent plus à Postgres en superuser.
+Un rôle `verbatim_app` (LOGIN, **NOSUPERUSER/NOCREATEDB/NOCREATEROLE**, DML
+seul) est créé/rafraîchi par un nouveau one-shot `db-init`
+([`files/db-init.sql`](infra/ansible/roles/app/files/db-init.sql)) qui tourne
+**après** `migrate` à chaque déploiement ; `migrate` garde le superuser
+(propriétaire du schéma). Le secret `app_db_password` a été provisionné dans
+les deux copies (`prod-secrets.yml` **et** `PROD_SECRETS`) avant tout push, la
+condition qui rendait O5 non-blind-applicable étant ainsi levée.
+
+**Décisions :**
+- **db-init séparé de migrate, en SQL brut (psql), pas en migration EF.** Les
+  rôles sont du niveau cluster, pas du schéma : les mêler aux migrations
+  mettrait un mot de passe dans une migration et couplerait le contrat de
+  schéma à la gestion d'identité. Le script est idempotent et porte la rotation
+  du mot de passe applicatif (`ALTER ROLE … PASSWORD` à chaque deploy) — pas de
+  piège d'init, contrairement au superuser.
+- **Une seule maison pour `db-init.sql`** (`infra/…/files/`, là où le deploy la
+  lit). Le test d'intégration la lit via un mount read-only dans le compose de
+  dev : une source unique, pas de copie qui dérive. Le test exécute le **vrai**
+  script sur une base migrée jetable et prouve le moindre privilège (DML de
+  l'app OK, gestes superuser refusés : DDL, `COPY … TO PROGRAM`, `pg_authid`).
+- **Dev inchangé** (backend self-migrate en superuser) : mirrorer la topologie
+  prod (migrate + db-init séparés) dans le compose de dev fragiliserait l'e2e
+  pour un gain nul — la garde CI ci-dessus couvre la propriété de sécurité.
+
+Reste, avant ouverture : **F7** (SSH non-root, étagé, dispo Yannick requise).
+
 ## 2026-07-15 — Dead-man's-switch de backup ; O5/F7 gated sur action opérateur
 
 **Fait :** l'alerte d'échec de backup (D3) est câblée. Le script de backup

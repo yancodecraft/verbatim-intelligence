@@ -35,6 +35,14 @@
     dest: /opt/verbatim/compose.yaml
     mode: "0644"
 
+# The db-init one-shot bind-mounts this to provision the non-superuser app
+# role (O5). No secret inside — the password rides in via the environment.
+- name: Install the database bootstrap script (non-superuser app role)
+  ansible.builtin.copy:
+    src: db-init.sql
+    dest: /opt/verbatim/db-init.sql
+    mode: "0644"
+
 - name: Install the Caddyfile
   ansible.builtin.template:
     src: Caddyfile.j2

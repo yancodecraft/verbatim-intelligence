@@ -170,6 +170,14 @@ sur l'hôte (réseau Docker interne uniquement, Redis avec mot de passe) ;
 secrets en variables d'environnement hors repo ; backups Postgres
 automatiques, chiffrés, hors de la machine, avec restauration testée.
 
+**Moindre privilège applicatif Postgres** : à l'exécution, backend et worker
+se connectent avec un rôle **non-superuser** (`verbatim_app`), limité au DML.
+Seuls les deux one-shots au démarrage touchent la base en admin : `migrate`
+(schéma, propriétaire des migrations) puis `db-init` qui crée/rafraîchit ce
+rôle applicatif (`files/db-init.sql`, idempotent — il fait aussi la rotation
+du mot de passe applicatif à chaque déploiement). Une injection SQL ou une
+brique compromise touche des données, pas le cluster.
+
 **Backups, le mécanisme** : un timer systemd (posé par Ansible) fait chaque
 nuit `pg_dump` → chiffrement `age` → bucket Object Storage dédié, versionné,
 rétention 30 jours. Asymétrie voulue : le serveur ne détient que la **clé

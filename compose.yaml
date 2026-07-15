@@ -22,6 +22,10 @@ services:
     volumes:
       - ./backend:/app
       - backend_nuget:/home/app/.nuget
+      # The O5 least-privilege test runs the real role-provisioning script
+      # (its prod home is infra/ansible/roles/app/files); mounting it read-only
+      # keeps the test honest against the shipped artifact, not a copy.
+      - ./infra/ansible/roles/app/files/db-init.sql:/opt/db-init.sql:ro
     environment:
       # Dev-only credentials, matching the postgres and redis services below.
       ConnectionStrings__Database: "Host=postgres;Database=verbatim;Username=verbatim;Password=verbatim"

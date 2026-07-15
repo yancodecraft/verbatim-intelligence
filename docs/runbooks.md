@@ -24,21 +24,26 @@ restaure l'ancienne valeur.
    est recréé au deploy et recharge la clé depuis l'environnement.
 4. Vérifier qu'une nouvelle analyse aboutit.
 
-## Rotation du mot de passe Postgres
+## Rotation des mots de passe Postgres
 
-⚠️ **Le chemin nominal ne suffit pas.** `POSTGRES_PASSWORD` n'agit qu'à
-l'initialisation du volume. Changer le secret puis déployer met à jour les
-chaînes de connexion mais **pas** le mot de passe réel en base → l'app perd
-l'accès.
+Il y a **deux** mots de passe depuis O5 : le superuser `verbatim`
+(`postgres_password`, utilisé par `migrate`) et le rôle applicatif
+`verbatim_app` (`app_db_password`, utilisé par backend et worker à l'exécution).
 
-Procédure correcte :
+**Rôle applicatif `verbatim_app` (le cas courant) — trivial :** changer
+`app_db_password` dans les **deux copies** (`prod-secrets.yml`, `PROD_SECRETS`)
+et redéployer. Le one-shot `db-init` fait un `ALTER ROLE … PASSWORD` à chaque
+déploiement, donc la base et les chaînes de connexion restent cohérentes — pas
+de piège d'init.
+
+**Superuser `verbatim` — piégeux :** ⚠️ le chemin nominal ne suffit pas.
+`POSTGRES_PASSWORD` n'agit qu'à l'initialisation du volume. Changer le secret
+puis déployer met à jour la chaîne de `migrate` mais **pas** le mot de passe
+réel en base → `migrate` perd l'accès. Procédure correcte :
 1. `ALTER USER verbatim WITH PASSWORD '<nouveau>';` dans la base (via un shell
    psql sur le conteneur postgres).
-2. Mettre à jour le secret dans les deux copies (`prod-secrets.yml`, `PROD_SECRETS`).
-3. Redéployer pour propager les chaînes de connexion.
-
-(Simplifié le jour où O5 introduit un rôle applicatif distinct : c'est ce
-rôle-là qu'on fait tourner, pas le superuser.)
+2. Mettre à jour `postgres_password` dans les deux copies.
+3. Redéployer pour propager la chaîne de connexion.
 
 ## Rotation Redis / basic-auth d'edge / clé SMTP
 

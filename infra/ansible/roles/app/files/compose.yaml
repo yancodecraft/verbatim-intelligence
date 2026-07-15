@@ -23,7 +23,9 @@ services:
     image: ghcr.io/yancodecraft/verbatim-intelligence/backend:${TAG}
     restart: unless-stopped
     environment:
-      ConnectionStrings__Database: "Host=postgres;Database=verbatim;Username=verbatim;Password=${POSTGRES_PASSWORD}"
+      # Runtime connects as the non-superuser app role (O5, db-init below);
+      # only migrate touches the DB with superuser rights.
+      ConnectionStrings__Database: "Host=postgres;Database=verbatim;Username=verbatim_app;Password=${APP_DB_PASSWORD}"
       ConnectionStrings__Redis: "redis:6379,password=${REDIS_PASSWORD}"
       # Magic links go out through Scaleway TEM (see infra/terraform/tem.tf).
       # Port 2587, not 587: Scaleway instances drop outbound SMTP on the
@@ -41,11 +43,11 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      migrate:
+      db-init:
         condition: service_completed_successfully
 
-  # One-shot job: applies EF Core migrations, then exits. The backend only
-  # starts once it has succeeded (the schema contract is honored first).
+  # One-shot job: applies EF Core migrations, then exits. Owns the schema, so
+  # it keeps the superuser connection; db-init and the backend start after it.
   migrate:
     image: ghcr.io/yancodecraft/verbatim-intelligence/migrations:${TAG}
     restart: "no"
@@ -55,11 +57,40 @@ services:
       postgres:
         condition: service_healthy
 
+  # One-shot job: creates/refreshes the non-superuser application role after the
+  # schema exists (O5, docs/security-review.md). Superuser connection — the only
+  # place besides migrate that touches the DB with admin rights. Idempotent, so
+  # it also rotates the app password on every deploy. The SQL is the shipped
+  # artifact (files/db-init.sql), installed alongside this compose file.
+  db-init:
+    image: postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15
+    restart: "no"
+    environment:
+      PGHOST: postgres
+      PGUSER: verbatim
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: verbatim
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+    volumes:
+      - /opt/verbatim/db-init.sql:/db-init.sql:ro
+    # $$ keeps compose from interpolating: the value is already in the env,
+    # the container shell expands it (never on the command line of a peer).
+    command:
+      - sh
+      - -c
+      - psql -v ON_ERROR_STOP=1 -v app_password="$$APP_DB_PASSWORD" -f /db-init.sql
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
   ai-worker:
     image: ghcr.io/yancodecraft/verbatim-intelligence/ai-worker:${TAG}
     restart: unless-stopped
     environment:
-      DATABASE_URL: "postgresql://verbatim:${POSTGRES_PASSWORD}@postgres:5432/verbatim"
+      # Same non-superuser app role as the backend (O5).
+      DATABASE_URL: "postgresql://verbatim_app:${APP_DB_PASSWORD}@postgres:5432/verbatim"
       REDIS_URL: "redis://:${REDIS_PASSWORD}@redis:6379/0"
       # Real Anthropic API in production — no stub here, ever. Model and
       # cost cap ride on the code defaults (claude-opus-4-8, $1/analysis).
@@ -69,7 +100,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      migrate:
+      db-init:
         condition: service_completed_successfully
 
   postgres:

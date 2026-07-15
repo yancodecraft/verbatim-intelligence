@@ -260,3 +260,8 @@ l'état, garder le basic-auth d'edge.
     refuser chaque geste superuser. Élargir les droits casse le test.
   - **Secret provisionné** : `app_db_password` ajouté aux deux copies
     (fichier local + `PROD_SECRETS`). Reste **F7** (SSH non-root).
+  - **Durci après revue** : `db-init.sql` lit le mot de passe via `\getenv`
+    (variable d'environnement), jamais via `-v` sur la ligne de commande `psql`
+    — il n'apparaît donc pas dans l'`argv` du process (visible par `ps`/`docker
+    top`/outillage d'audit). Rayon d'exposition du secret réduit au strict
+    `/opt/verbatim/.env` (0600).

@@ -5,8 +5,11 @@
 --
 -- Idempotent by design: safe to replay, and the ALTER ROLE ... PASSWORD doubles
 -- as the app-role rotation (change APP_DB_PASSWORD, redeploy — no initdb gotcha,
--- unlike the superuser password). The password is passed in as the psql variable
--- :app_password and is never written to the repo.
+-- unlike the superuser password). The password is read from the environment
+-- (never the repo, never the psql command line — it would land in the process
+-- argv, visible to ps/docker top; \getenv keeps it out of argv).
+\getenv app_password APP_DB_PASSWORD
+
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'verbatim_app') THEN

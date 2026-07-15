@@ -73,12 +73,14 @@ services:
       APP_DB_PASSWORD: ${APP_DB_PASSWORD}
     volumes:
       - /opt/verbatim/db-init.sql:/db-init.sql:ro
-    # $$ keeps compose from interpolating: the value is already in the env,
-    # the container shell expands it (never on the command line of a peer).
+    # The password stays in the environment: db-init.sql reads it with \getenv,
+    # so it never reaches psql's command line (where ps/docker top could see it).
     command:
-      - sh
-      - -c
-      - psql -v ON_ERROR_STOP=1 -v app_password="$$APP_DB_PASSWORD" -f /db-init.sql
+      - psql
+      - -v
+      - ON_ERROR_STOP=1
+      - -f
+      - /db-init.sql
     depends_on:
       postgres:
         condition: service_healthy

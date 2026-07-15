@@ -30,6 +30,9 @@ public sealed class DatabaseLeastPrivilegeTests : IAsyncLifetime
         "postgres:18-alpine@sha256:9a8afca54e7861fd90fab5fdf4c42477a6b1cb7d293595148e674e0a3181de15")
         .WithUsername("verbatim")
         .WithDatabase("verbatim")
+        // db-init.sql reads the app password with \getenv, off the command line —
+        // the test provisions it the same way, through the environment.
+        .WithEnvironment("APP_DB_PASSWORD", AppPassword)
         .Build();
 
     private string AppConnectionString
@@ -67,7 +70,7 @@ public sealed class DatabaseLeastPrivilegeTests : IAsyncLifetime
         await _postgres.CopyAsync(script, ContainerScriptPath);
         var result = await _postgres.ExecAsync(
         [
-            "psql", "-v", "ON_ERROR_STOP=1", "-v", $"app_password={AppPassword}",
+            "psql", "-v", "ON_ERROR_STOP=1",
             "-U", "verbatim", "-d", "verbatim", "-f", ContainerScriptPath,
         ]);
         Assert.True(result.ExitCode == 0, result.Stderr);

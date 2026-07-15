@@ -33,6 +33,12 @@ condition qui rendait O5 non-blind-applicable étant ainsi levée.
   prod (migrate + db-init séparés) dans le compose de dev fragiliserait l'e2e
   pour un gain nul — la garde CI ci-dessus couvre la propriété de sécurité.
 
+**Reprise (revue du diff O5) :** le mot de passe applicatif passait par
+`psql -v app_password=…`, donc visible dans l'`argv` du process (ps/docker
+top/audit). Corrigé — `db-init.sql` le lit via `\getenv` depuis
+l'environnement, hors ligne de commande ; le secret ne vit plus que dans
+`/opt/verbatim/.env` (0600).
+
 Reste, avant ouverture : **F7** (SSH non-root, étagé, dispo Yannick requise).
 
 ## 2026-07-15 — Dead-man's-switch de backup ; O5/F7 gated sur action opérateur

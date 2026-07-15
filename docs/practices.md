@@ -187,7 +187,7 @@ finie quand :
 - Les documents de référence vivent dans `docs/` : [spec](v1-spec.md),
   [architecture](architecture.md), [roadmap](roadmap.md),
   [glossaire](glossary.md), [RGPD](rgpd.md),
-  [security review](security-review.md), et ce document.
+  [security review](security-review.md), [runbooks](runbooks.md), et ce document.
 
 ## Langues
 

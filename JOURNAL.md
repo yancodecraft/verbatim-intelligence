@@ -6,6 +6,26 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-15 — Garde anti-IDOR par métadonnée et runbooks d'exploitation
+
+**Fait :** findings F9 (architecture) et D4/D2 (procédures).
+
+- **Test d'architecture (F9)** : `RequireAccount` ajoute désormais une
+  métadonnée `AccountScopedMarker` sur l'endpoint. Un test énumère tous les
+  endpoints routés et exige que chacun, hors liste publique explicite
+  (magic-link, verify, me, logout, shared, health), porte ce marqueur. Le
+  risque « un nouvel endpoint oublie le scoping et fuite des données » est
+  désormais **attrapé par le build**, pas par la revue.
+- **Runbooks (D4/D2)** : nouveau [docs/runbooks.md](docs/runbooks.md) —
+  rotations de secrets (clé Anthropic en double copie, le piège du mot de passe
+  Postgres qui n'agit qu'à l'initdb, Redis/basic-auth/SMTP) et **escrow de la
+  clé de backup `age`** (rappel de l'action manuelle : seconde copie hors ligne,
+  sinon point unique de défaillance de la restauration).
+
+**Décision — F4 accepté tel quel :** pas de rate limit sur `/health`. Le front
+le sonde en continu ; un plafond y casserait le poll pour un bénéfice « Info ».
+À traiter à l'edge si l'exposition publique le justifie un jour.
+
 ## 2026-07-15 — Purge périodique des tables d'auth (finding D5/A4)
 
 **Fait :** un `AuthCleanupService` (service de fond, passe horaire) qui supprime

@@ -12,8 +12,12 @@ public static class CurrentAccount
     private const string ItemKey = "vi:current-user";
 
     public static TBuilder RequireAccount<TBuilder>(this TBuilder builder)
-        where TBuilder : IEndpointConventionBuilder =>
-        builder.AddEndpointFilter(async (context, next) =>
+        where TBuilder : IEndpointConventionBuilder
+    {
+        // A marker on the endpoint so an architecture test can prove every
+        // non-public endpoint is account-scoped (docs/security-review.md, F9).
+        builder.Add(endpoint => endpoint.Metadata.Add(AccountScopedMarker.Instance));
+        return builder.AddEndpointFilter(async (context, next) =>
         {
             var http = context.HttpContext;
             var user = await AuthEndpoints.ResolveUserAsync(
@@ -32,10 +36,21 @@ public static class CurrentAccount
             http.RequestServices.GetRequiredService<CurrentAccountAccessor>().UserId = user.Id;
             return await next(context);
         });
+    }
 
     /// <summary>Only callable behind <see cref="RequireAccount{TBuilder}"/>.</summary>
     public static User CurrentUser(this HttpContext http) =>
         http.Items[ItemKey] as User
         ?? throw new InvalidOperationException(
             "No account on this request: the endpoint is missing RequireAccount().");
+}
+
+/// <summary>Endpoint metadata marking an endpoint as account-scoped.</summary>
+public sealed class AccountScopedMarker
+{
+    public static readonly AccountScopedMarker Instance = new();
+
+    private AccountScopedMarker()
+    {
+    }
 }

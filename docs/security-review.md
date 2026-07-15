@@ -224,3 +224,14 @@ l'état, garder le basic-auth d'edge.
     — un e-mail n'est plus conservé indéfiniment après un lien de connexion
     resté sans suite. Prédicat strict : un compte porteur de données n'est
     jamais touché. Logique testée en isolation.
+- **2026-07-15 — garde anti-IDOR et runbooks (F9, D4, D2).**
+  - **F9 corrigé** : `RequireAccount` pose une métadonnée sur l'endpoint, et un
+    test d'architecture énumère tous les endpoints routés — tout endpoint hors
+    liste publique doit la porter. Un futur endpoint qui oublie `RequireAccount`
+    casse le build au lieu de fuiter.
+  - **D4 / D2 documentés** : [runbooks.md](runbooks.md) — rotations (Anthropic
+    double copie, piège Postgres, Redis/basic-auth/SMTP) et escrow de la clé de
+    backup `age` (action manuelle : seconde copie hors ligne).
+  - **F4 accepté** : pas de rate limit sur `/health` — le front le sonde en
+    continu, un plafond y casserait le poll pour un gain « Info ». À revisiter à
+    l'edge si besoin après ouverture.

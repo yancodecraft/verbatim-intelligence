@@ -157,13 +157,19 @@ Chaque brique porte ses propres tests ; rien n'est « fini » sans eux.
 ## Hébergement
 
 Un VPS unique chez **Scaleway** (`verbatim.yantech.fr`) : Docker Compose en
-production, Caddy en frontal (TLS). **Tout est déclaratif, dans `infra/`** :
-Terraform décrit l'infrastructure (instance, IP, security group, clé SSH —
-state distant dans un bucket Object Storage), Ansible décrit la
-configuration de la machine (durcissement, Docker, l'application). Les deux
-s'exécutent en conteneurs via le Makefile ; aucune modification manuelle
-sur le serveur. Les images de production sont publiées sur GHCR (gratuit
-pour un repo public, authentification native des workflows).
+production, Caddy en frontal (TLS). Toutes les ressources vivent dans un
+**projet Scaleway dédié** (`verbatim`), isolé des autres projets de
+l'organisation — cloison de facturation et de rayon d'action. **Tout est
+déclaratif, dans `infra/`** : Terraform décrit l'infrastructure (instance,
+IP, security group, clé SSH — state distant dans un bucket Object Storage),
+Ansible décrit la configuration de la machine (durcissement, Docker,
+l'application). Les deux s'exécutent en conteneurs via le Makefile ; aucune
+modification manuelle sur le serveur. L'outillage Terraform s'authentifie
+avec une **clé API dédiée au projet** (défaut = `verbatim`, hors repo) : son
+projet par défaut est ce qui route le backend d'état Object Storage vers le
+bon projet — c'est une propriété de la clé, pas une variable d'environnement.
+Les images de production sont publiées sur GHCR (gratuit pour un repo public,
+authentification native des workflows).
 
 Contraintes non négociables : Postgres et Redis ne sont **jamais** publiés
 sur l'hôte (réseau Docker interne uniquement, Redis avec mot de passe) ;

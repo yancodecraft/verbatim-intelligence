@@ -6,6 +6,43 @@ décisions. Entrées les plus récentes en haut.
 
 ---
 
+## 2026-07-16 — Migration vers un projet Scaleway dédié
+
+**Fait :** toute l'infra Verbatim vit désormais dans un **projet Scaleway
+dédié** (`verbatim`), isolée du projet `yfunnel` où elle avait atterri par
+accident. Instance, IP, security group, clé SSH, domaine TEM, buckets Object
+Storage (backups + état Terraform), IAM : tout reconstruit dans `verbatim`,
+`yfunnel` vidé de toute ressource Verbatim. Vérifié en réel : site (edge 401,
+shared 404, certificat Let's Encrypt frais), déploiement idempotent sous
+`deploy`, backup chiffré déposé dans le nouveau bucket, magic link envoyé via
+TEM (statut *sent*).
+
+**Cause racine :** le Makefile lisait le `default_project_id` de la config
+`scw` de l'opérateur pour `TF_VAR_project_id` ; ce défaut pointait `yfunnel`,
+donc tout Terraform y atterrissait silencieusement.
+
+**Décisions & apprentissages :**
+- **Scaleway ne déplace pas les ressources entre projets** (instance, IP,
+  bucket, TEM sont épinglés à la création). Basculer le projet par défaut ne
+  déplace rien : le `plan` ne voyait que 2 diffs (seule la clé backup référence
+  `var.project_id`). La seule voie propre = **détruire la stack et la
+  reconstruire** dans le nouveau projet — ce qui collait au choix « repartir à
+  neuf » (pré-lancement, aucune donnée réelle).
+- **Le routage S3 se fait par le `default_project_id` de la clé API**, pas par
+  une variable d'environnement. La clé perso (owner, défaut `yfunnel`) recevait
+  `AccessDenied` sur les buckets `verbatim`. D'où le découplage : une **clé API
+  dédiée** au projet (défaut `verbatim`, hors repo dans `scaleway.env`) porte
+  désormais le backend d'état et le provider. Le Makefile ne dépend plus du tout
+  de la config `scw` ambiante (fin de la cause racine).
+- **TEM** : un projet neuf n'a pas d'abonnement TEM → souscription de l'offre
+  `essential`. Le nouveau domaine a un nouveau DKIM (nom porté par l'ID de
+  projet) : DKIM/DMARC posés à la main chez Hostinger (le provider ne les gère
+  pas), validation passée en 6 s.
+- **Bucket d'état** migré via un aller-retour en état local (sauvegardes en
+  main), recréé versionné dans `verbatim`, `plan` final *No changes*.
+- Secrets tournés (SMTP + clés backup, nouvelles clés IAM) dans les deux
+  copies. Nouvelle IP `51.15.213.213` (A record Hostinger, TTL 300).
+
 ## 2026-07-15 — SSH non-root (F7), étapes A+B ; alerte backup activée
 
 **Fait :**

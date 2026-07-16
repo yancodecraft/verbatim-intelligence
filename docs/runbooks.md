@@ -16,6 +16,28 @@ un déploiement CI ultérieur **réinjecte `PROD_SECRETS`**. Donc toute rotation
 doit mettre à jour **les deux copies**, sinon le prochain merge sur `main`
 restaure l'ancienne valeur.
 
+À part, un **troisième** fichier opérateur sert uniquement à l'outillage
+Terraform : `~/.config/verbatim-intelligence/scaleway.env` (0600, hors repo)
+porte la clé API Scaleway dédiée au projet `verbatim`. Le Makefile la lit pour
+les cibles `infra-*` / `deploy` (variables `SCW_*` et `AWS_*`). Il n'entre pas
+dans `PROD_SECRETS` : la CD ne touche pas Terraform, seul le poste opérateur
+gère l'état.
+
+## Clé infra Scaleway (projet dédié)
+
+Verbatim vit dans un **projet Scaleway dédié** (`verbatim`). Le point subtil :
+le backend d'état Terraform (Object Storage, compatible S3) est routé vers un
+projet par le **projet par défaut de la clé API**, pas par une variable —
+d'où une clé dédiée dont le défaut est `verbatim`, stockée dans `scaleway.env`.
+Conséquences pratiques :
+- Rotation : recréer la clé (`scw iam api-key create user-id=<owner> \
+  default-project-id=<verbatim> expires-at=…`), remplacer les valeurs dans
+  `scaleway.env`, `make infra-init` puis `make infra-plan` (doit afficher
+  *No changes*). Expire 2027-07-01.
+- Le bucket d'état (`yantech-verbatim-tfstate`, versionné) est **dans le projet
+  `verbatim`** ; ne l'atteindre qu'avec cette clé (une clé dont le défaut est un
+  autre projet reçoit `AccessDenied`).
+
 ## Rotation de la clé API Anthropic
 
 1. Console Anthropic → créer une nouvelle clé, révoquer l'ancienne.

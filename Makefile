@@ -9,18 +9,26 @@ TRIVY_IMAGE = aquasec/trivy@sha256:cffe3f5161a47a6823fbd23d985795b3ed72a4c806da4
 PLAYWRIGHT_IMAGE = mcr.microsoft.com/playwright@sha256:5b8f294aff9041b7191c34a4bab3ac270157a28774d4b0660e9743297b697e48
 TERRAFORM_IMAGE = hashicorp/terraform@sha256:7ae513256f7ce67879e218ae8593d6fbe216ec9e123abe6c94e4e10704857963
 
-# Terraform runs in a container; Scaleway credentials are read from the scw
-# CLI config at invocation time and the state backend is S3-compatible
-# Object Storage. Nothing sensitive ever enters the repo.
-SCW_CONFIG = $(HOME)/.config/scw/config.yaml
-TF_ENV = AWS_ACCESS_KEY_ID=$$(awk '$$1=="access_key:"{print $$2}' "$(SCW_CONFIG)") \
-         AWS_SECRET_ACCESS_KEY=$$(awk '$$1=="secret_key:"{print $$2}' "$(SCW_CONFIG)") \
+# Terraform runs in a container. Scaleway credentials come from a dedicated,
+# project-scoped API key kept outside the repo (never the personal scw config):
+# its DEFAULT PROJECT is 'verbatim', which is what routes the S3-compatible
+# Object Storage state backend to the verbatim project. Same key drives the
+# scaleway provider (SCW_* env) so resources land in verbatim too. Nothing
+# sensitive ever enters the repo.
+SCW_ENV = $(HOME)/.config/verbatim-intelligence/scaleway.env
+scw_env = $$(awk -F= '$$1=="$(1)"{print $$2}' "$(SCW_ENV)")
+TF_ENV = SCW_ACCESS_KEY=$(call scw_env,SCW_ACCESS_KEY) \
+         SCW_SECRET_KEY=$(call scw_env,SCW_SECRET_KEY) \
+         SCW_DEFAULT_PROJECT_ID=$(call scw_env,SCW_DEFAULT_PROJECT_ID) \
+         SCW_DEFAULT_ORGANIZATION_ID=$(call scw_env,SCW_DEFAULT_ORGANIZATION_ID) \
+         AWS_ACCESS_KEY_ID=$(call scw_env,SCW_ACCESS_KEY) \
+         AWS_SECRET_ACCESS_KEY=$(call scw_env,SCW_SECRET_KEY) \
          TF_VAR_ssh_public_key="$$(cat "$(HOME)/.ssh/verbatim_ed25519.pub")" \
          TF_VAR_hostinger_api_token=$$(awk '$$1=="api_token:"{print $$2}' "$(HOME)/.hapi.yaml") \
-         TF_VAR_project_id=$$(awk '$$1=="default_project_id:"{print $$2}' "$(SCW_CONFIG)")
+         TF_VAR_project_id=$(call scw_env,SCW_DEFAULT_PROJECT_ID)
 TF_RUN = docker run --rm \
          -v "$(CURDIR)/infra/terraform":/infra \
-         -v "$(SCW_CONFIG)":/root/.config/scw/config.yaml:ro \
+         -e SCW_ACCESS_KEY -e SCW_SECRET_KEY -e SCW_DEFAULT_PROJECT_ID -e SCW_DEFAULT_ORGANIZATION_ID \
          -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e TF_VAR_ssh_public_key \
          -e TF_VAR_hostinger_api_token -e TF_VAR_project_id \
          $(TERRAFORM_IMAGE)

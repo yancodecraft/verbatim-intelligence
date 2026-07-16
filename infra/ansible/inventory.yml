@@ -2,7 +2,7 @@
 all:
   hosts:
     verbatim:
-      ansible_host: 51.158.72.142
+      ansible_host: 51.15.213.213
       # Deployments connect as the non-root deploy user and sudo to root
       # (F7, become at the play level). First-time bootstrap of a brand-new
       # host still needs a one-time root connection to create this user.

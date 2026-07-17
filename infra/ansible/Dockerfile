@@ -1,6 +1,6 @@
 # Tooling image for running Ansible (make configure) — Docker stays the
 # only local dependency. Pinned base, pinned ansible-core and collections.
-FROM ghcr.io/astral-sh/uv@sha256:7cf77f594be8042dab6daa9fe326f90962252268b4f120a7f5dccce4d947e6c1
+FROM ghcr.io/astral-sh/uv@sha256:eb2843a1e56fd9e30c7276ce1a52cba86e64c7b385f5e3279a0e08e02dd058fc
 
 # DL3008: tooling image — openssh-client tracks the pinned base image;
 # pinning the Debian point release breaks every rebuild for no gain here.

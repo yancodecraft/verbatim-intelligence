@@ -20,7 +20,7 @@ RUN dotnet tool restore \
        dotnet ef migrations bundle --project src/VerbatimIntelligence.Api \
        --configuration Release --self-contained -r linux-musl-x64 -o /out/efbundle
 
-FROM mcr.microsoft.com/dotnet/aspnet@sha256:57bd717ac18ff6c8a39cc0ee4a76c1f15adc46df50434c73eff0c3f1df4c88f0 AS api
+FROM mcr.microsoft.com/dotnet/aspnet@sha256:1fa23fc4872d95fd71c2833ebe65d7e84a43b2d51a31d119516852f13d9505a7 AS api
 
 WORKDIR /app
 COPY --from=build /out/api .
@@ -32,7 +32,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=15s \
 
 ENTRYPOINT ["dotnet", "VerbatimIntelligence.Api.dll"]
 
-FROM mcr.microsoft.com/dotnet/aspnet@sha256:57bd717ac18ff6c8a39cc0ee4a76c1f15adc46df50434c73eff0c3f1df4c88f0 AS migrations
+FROM mcr.microsoft.com/dotnet/aspnet@sha256:1fa23fc4872d95fd71c2833ebe65d7e84a43b2d51a31d119516852f13d9505a7 AS migrations
 
 WORKDIR /app
 COPY --from=build /out/efbundle .

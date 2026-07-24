@@ -5,7 +5,7 @@ description = "Consumes pending analyses and runs the LLM pipeline"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "anthropic>=0.75",
+    "anthropic>=0.119.0",
     "psycopg[binary]>=3.3.4",
     "redis>=8.0.1",
 ]
